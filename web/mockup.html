@@ -158,11 +158,10 @@
   .icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
   .reg { display: grid; justify-items: center; white-space: nowrap; font-size: 13px; }
-  .reg a { display: inline-flex; align-items: center; justify-content: center; min-width: 56px; height: 24px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--link) 22%, var(--bg)); border-radius: 6px; background: color-mix(in srgb, var(--link) 6%, var(--bg)); color: var(--link); font-size: 12px; font-weight: 600; line-height: 1; text-decoration: none; }
+  .reg a, .reg button { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 24px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--link) 22%, var(--bg)); border-radius: 6px; background: color-mix(in srgb, var(--link) 6%, var(--bg)); color: var(--link); font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1; text-decoration: none; }
   .reg a:hover { border-color: color-mix(in srgb, var(--link) 45%, var(--bg)); background: color-mix(in srgb, var(--link) 12%, var(--bg)); }
   .reg a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-  .opens { display: grid; grid-template-columns: 28px 16px; column-gap: 3px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .opens span:last-child { text-align: right; }
+  .reg .opens { border-color: var(--control-border); background: var(--hover); color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; pointer-events: none; }
 
   /* Status lights: new, old and server groups, each with a male and a female column */
   .lights { display: flex; gap: 12px; align-self: stretch; }
@@ -699,7 +698,7 @@ function rowHTML(c, avail, f) {
   const l = c.loc;
   const statuses = avail === 'soon' ? {} : lights(c);
   const reg = avail === 'soon'
-    ? `<span class="opens" data-tip="Registration opens ${esc(longDate(c.enroll))}"><span>${MON[ymd(c.enroll)[1] - 1]}</span><span>${ymd(c.enroll)[2]}</span></span>`
+    ? `<button type="button" class="opens" disabled aria-label="Registration opens ${esc(longDate(c.enroll))}">${ymd(c.enroll)[2]} ${MON[ymd(c.enroll)[1] - 1]}</button>`
     : `<a href="${esc(c.apply)}" target="_blank" rel="noopener" aria-label="${esc(`Apply for ${TYPE.get(c.type).name} at ${l.name}, ${longDate(c.start)}`)}">Apply</a>`;
   const cell = k => {
     const s = statuses[k], hl = k === f.as ? ' hl' : '';
@@ -713,7 +712,7 @@ function rowHTML(c, avail, f) {
     dates: `<span class="dates" data-column="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>`,
     type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span></span>`,
     lights: `<span class="lights" data-column="lights">${lightCells}</span>`,
-    apply: `<span class="reg" data-column="apply">${reg}</span>`,
+    apply: `<span class="reg" data-column="apply"${avail === 'soon' ? ` data-tip="Registration opens ${esc(longDate(c.enroll))}"` : ''}>${reg}</span>`,
     links: `<span class="links" data-column="links">${link(l.schedule, 'Course schedule', ICONS.schedule)}${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
   };
   return `<div class="row" data-id="${c.id}">${columnOrder.map(key => cells[key]).join('')}</div>`;

@@ -89,11 +89,12 @@ its index package have been removed.
      - Hovering the code shows the full name, with the languages on a second line.
   4. **Lights**: six 13px columns with a two-row heading: NEW / OLD / SRV, each over M F.
      Columns in a pair are 2px apart, groups 12px apart.
-  5. **Apply**: a centered link styled as a quiet blue button, 24px high and at least 56px wide,
+  5. **Apply**: a centered link styled as a quiet blue button, 24px high and 64px wide,
      with a fine border, 6px corners, and a very faint blue fill. Hover strengthens the border
      and fill; keyboard focus has a visible outline. It still opens the application form in
-     another tab. Before registration opens it
-     shows the opening date instead, as aligned month and day columns ("Mar  2", "Mar 21").
+     another tab. Before registration opens it shows the opening date inside a disabled
+     button with the same fixed dimensions, a muted border and fill, and the day before the month
+     ("2 Mar", "21 Mar"). Hovering shows the full registration opening date.
   6. **Links**: the schedule calendar icon, followed by the notes icon when comments exist.
      Notes are always last, beside the schedule icon, rather than beside the course type.
      The notes button toggles an inline panel under the row showing sanitized comments,
