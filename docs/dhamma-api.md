@@ -1,12 +1,17 @@
 # dhamma.org data sources
 
-What `sit` reads from www.dhamma.org. None of this is a documented public API: these are the
-endpoints and inline data the site's own pages use, so they can change without notice. Verified
-2026-11-13.
+Data sources on www.dhamma.org for the website's sample data and future JavaScript backend.
+None of this is a documented public API: these are the endpoints and inline data the site's own
+pages use, so they can change without notice. Verified 2026-11-13.
 
 Plain HTTP requests work. No cookies, CSRF token or browser headers are needed, and none should be
 sent: don't replay cookies from a browser session (such as Cloudflare's `cf_clearance`) or imitate
 a browser.
+
+A search POST tested with `Origin: http://localhost:8000` returned JSON but no
+`Access-Control-Allow-Origin` header. Browser JavaScript at that origin cannot read the response;
+use a small same-origin JavaScript proxy for live searches. The Origin header was used only to
+check CORS behavior; ordinary backend requests do not need it.
 
 ## Course search: `POST /en-US/courses/do_search`
 
@@ -77,8 +82,8 @@ Useful course fields:
 
 ### Course type IDs
 
-Listed in `viewModel.course_types(...)` on `/en/courses/search` and cached by `sit update`. By
-search mode:
+Listed in `viewModel.course_types(...)` on `/en/courses/search`. A future JavaScript metadata
+script can extract these for the website. By search mode:
 
 - **NewStudents:** 3 10-Day, 31 9-Day
 - **OldStudents**, under the site's headings:
@@ -104,7 +109,7 @@ Search results give a course's type as a `raw_course_type` code, not the ID: 3 `
 ### Place IDs
 
 `regions[]` takes `<kind>_<id>`. Every valid value is listed in `viewModel.search_regions([...])`
-on `/en/courses/search`, and cached by `sit update` as `places`:
+on `/en/courses/search`; `web/mockup-data.js` contains a snapshot as `PLACES`:
 
 | Kind | Count | Example | Notes |
 |---|---|---|---|
@@ -121,8 +126,8 @@ For locations, `texts[4]` is the subdomain.
 
 One location as JSON: `id`, `sub_domain`, `dhamma_name`, `city`, `state`, `country`,
 `country_iso_code`, `center_noncenter` (`center` or `noncenter`), `schedule_url`, `website_url`,
-`map_url`, `year_of_first_course`, `location_languages`, and HTML `contact` and `about`. The index
-doesn't use it, since the maps page has what's needed for all locations in one request.
+`map_url`, `year_of_first_course`, `location_languages`, and HTML `contact` and `about`. The maps
+page can supply location names and coordinates in one request when only those fields are needed.
 
 ## Maps page: `GET /en/maps`
 

@@ -1,4 +1,5 @@
-# Builds web/mockup-data.js from saved do_search pages, the search and directory pages, and the sit index.
+# Legacy snapshot builder: reads saved search responses, directory pages and location metadata JSON.
+# New metadata-fetching work should use JavaScript; see docs/plan.md.
 import glob, json, os, re, sys
 sys.path.insert(0, os.path.dirname(__file__))
 from places import directory, search_places

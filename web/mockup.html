@@ -25,13 +25,14 @@
     --open: #2f9e44;
     --wait: #f0b400;
     --long-wait: #f76707;
-    --closed: #e03131;
+    --closed: #d94a4a;
     --unknown: #b8bec9;
-    --center: #37b24d;
     --noncenter: #228be6;
     --link: #2059c9;
     --long-fg: #7351a8;
     --long-bg: #f1ecf8;
+    --regular-fg: #586171;
+    --regular-bg: #fff;
     --special-fg: #287b7a;
     --special-bg: #e8f4f2;
   }
@@ -55,13 +56,14 @@
     --open: #40c057;
     --wait: #fcc419;
     --long-wait: #ff922b;
-    --closed: #fa5252;
+    --closed: #e26060;
     --unknown: #4f5764;
-    --center: #40c057;
     --noncenter: #4dabf7;
     --link: #7aa7ff;
     --long-fg: #c4a7ee;
     --long-bg: #2b2338;
+    --regular-fg: #b4bdca;
+    --regular-bg: #1b1f26;
     --special-fg: #85cec8;
     --special-bg: #1c3334;
   }
@@ -114,13 +116,13 @@
 
   /* Course list: one grid row per course */
   main { max-width: 1180px; margin: 0 auto; padding: 0 16px 32px; }
-  .row { display: grid; grid-template-columns: var(--columns); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: var(--columns, minmax(0, 1fr) 120px 84px 108px 84px 48px); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
   .row:not(.head):hover { background: var(--hover); }
   .head { position: sticky; top: var(--bar-h, 0px); z-index: 5; align-items: end; padding-top: 6px; padding-bottom: 4px; background: var(--bg); color: var(--muted); font-size: 11.5px; font-weight: 600; }
   .head .l, .head b { cursor: help; }
   .column-head { position: relative; display: flex; align-items: end; min-width: 0; padding: 2px 0; border: 0; border-radius: 2px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: grab; }
   .column-head:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-  .column-head[data-column=location] { padding-left: 27px; }
+  .column-head[data-column=location] { padding-left: 23px; }
   .column-head[data-column=type], .column-head[data-column=apply], .column-head[data-column=links] { justify-content: center; }
   .column-head.dragging { opacity: .35; }
   .column-head[data-drop=before] { box-shadow: -3px 0 var(--link); }
@@ -128,7 +130,9 @@
   h2 { position: sticky; top: calc(var(--bar-h, 0px) + var(--head-h, 0px)); z-index: 4; margin: 0; padding: 14px 8px 5px; background: var(--bg); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
   h2 span { margin-left: 8px; font-weight: 400; color: var(--faint); }
 
-  .flag { flex: none; width: 20px; font-size: 16px; line-height: 1; cursor: default; }
+  .flag { display: grid; place-items: center; flex: none; width: 16px; height: 16px; overflow: hidden; border-radius: 2px; outline: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); outline-offset: -1px; background: var(--photo-bg); opacity: .78; filter: saturate(.75); cursor: default; }
+  .flag:hover { opacity: 1; filter: none; }
+  .flag img { display: block; width: 100%; height: 100%; }
   .who { display: flex; align-items: center; gap: 7px; min-width: 0; }
   .name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: inherit; text-decoration: none; }
   a.name:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -138,11 +142,14 @@
   .dates .end { opacity: .4; }
   .type { display: flex; align-items: center; justify-content: center; min-width: 0; color: var(--muted); font-size: 12px; }
   .type > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .type-code { display: inline-block; padding: 2px 6px; border-radius: 4px; line-height: 18px; }
+  .type-code { display: inline-block; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; line-height: 16px; }
+  .type-code.regular { background: var(--regular-bg); color: var(--regular-fg); border-color: var(--control-border); }
   .type-code.long { background: var(--long-bg); color: var(--long-fg); }
   .type-code.special { background: var(--special-bg); color: var(--special-fg); }
+  .chip.regular span { color: var(--regular-fg); background: var(--regular-bg); }
   .chip.long span { color: var(--long-fg); background: var(--long-bg); border-color: transparent; }
   .chip.special span { color: var(--special-fg); background: var(--special-bg); border-color: transparent; }
+  .chip.regular input:checked + span { background: var(--regular-fg); color: var(--bg); }
   .chip.long input:checked + span { background: var(--long-fg); color: var(--bg); }
   .chip.special input:checked + span { background: var(--special-fg); color: var(--bg); }
 
@@ -152,8 +159,9 @@
   .icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
   .reg { display: grid; justify-items: center; white-space: nowrap; font-size: 13px; }
-  .reg a { color: var(--link); font-weight: 600; text-decoration: none; }
-  .reg a:hover { text-decoration: underline; }
+  .reg a { display: inline-flex; align-items: center; justify-content: center; min-width: 56px; height: 24px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--link) 22%, var(--bg)); border-radius: 6px; background: color-mix(in srgb, var(--link) 6%, var(--bg)); color: var(--link); font-size: 12px; font-weight: 600; line-height: 1; text-decoration: none; }
+  .reg a:hover { border-color: color-mix(in srgb, var(--link) 45%, var(--bg)); background: color-mix(in srgb, var(--link) 12%, var(--bg)); }
+  .reg a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   .opens { display: grid; grid-template-columns: 28px 16px; column-gap: 3px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .opens span:last-child { text-align: right; }
 
@@ -164,11 +172,13 @@
   .l { display: grid; place-items: center; text-align: center; }
   .l.hl { background: var(--hl); }
   .head .l.hl { color: var(--fg); }
-  i.light { display: inline-block; width: 10px; height: 10px; border-radius: 50%; color: var(--unknown); background: currentColor; }
-  i.g { color: var(--open); }
+  i.light { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; color: var(--unknown); background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, .3), transparent 65%), currentColor; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12), 0 0 0 2px color-mix(in srgb, currentColor 10%, transparent); }
+  i.g { color: var(--open); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1), 0 0 0 2px color-mix(in srgb, currentColor 20%, transparent); }
   i.y { color: var(--wait); }
   i.o { color: var(--long-wait); }
-  i.r { color: var(--closed); }
+  i.r { color: var(--closed); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
+  #list[data-as]:not([data-as=any]) .l:not(.hl) i.light { opacity: .28; }
+  .l.hl i.light { width: 10px; height: 10px; }
 
   /* Notes */
   .notes { padding: 8px 12px 10px 38px; border-bottom: 1px solid var(--line); background: var(--notes-bg); color: var(--notes-fg); font-size: 13px; }
@@ -232,13 +242,13 @@
 <div class="bar">
   <form id="filters" autocomplete="off">
     <span class="brand">sit <small>mockup · sample data</small></span>
-    <span class="f where-filter"><label for="place-search">Where</label>
-      <span class="where-box" id="where-box">
+    <div class="f where-filter"><label for="place-search">Where</label>
+      <div class="where-box" id="where-box">
         <input type="hidden" name="where">
         <span class="place-values"><span id="place-chips"></span><input type="search" id="place-search" placeholder="country, state or center" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="place-options" spellcheck="false"></span>
-        <span class="place-options" id="place-options" role="listbox" aria-label="Places" hidden></span>
-      </span>
-    </span>
+        <div class="place-options" id="place-options" role="listbox" aria-label="Places" hidden></div>
+      </div>
+    </div>
     <span class="f"><label for="from">From</label> <input type="date" name="from" id="from"></span>
     <span class="f course-filter"><span class="filter-label">Course</span> <span class="chips" id="types"></span></span>
     <span class="f"><label for="as">As</label>
@@ -300,7 +310,7 @@ const COVERS = { m: ['NM', 'OM'], w: ['NF', 'OF'], s: ['SM', 'SF'], nm: ['NM'], 
 const specificity = s => (s.type == null ? 0 : s.type.length === 1 ? 1 : 2);
 const LIGHTS = { Green: 'g', Yellow: 'y', Orange: 'o', Red: 'r' };
 
-// Course types the page covers, in filter order: dhamma.org's raw_course_type code, short and full name.
+// Course types the page covers: dhamma.org's raw_course_type code, short and full name.
 const TYPES = [
   ['10-Day', '10D', '10-day'],
   ['10-DayOSC', '10D OS', '10-day for old students'],
@@ -318,6 +328,15 @@ const TYPES = [
 const TYPE = new Map(TYPES.map(([raw, short, name]) => [raw, { short, name }]));
 // Course types that take new students; the others are for old students only.
 const NEW_STUDENT_TYPES = new Set(['10-Day', '10-DayExecutive']);
+const LONG_TYPES = new Set(['10-DaySpecial', '20-DayOSC', '30-DayOSC', '45-DayOSC', '60-DayOSC']);
+const SPECIAL_TYPES = new Set(['TSC', '14-DayGratitude', 'Satipatthana']);
+const typeClass = raw => LONG_TYPES.has(raw) ? 'long' : SPECIAL_TYPES.has(raw) ? 'special' : 'regular';
+const typeTip = raw => [TYPE.get(raw).name, LONG_TYPES.has(raw) ? 'Long course' : ''].filter(Boolean).join(' · ');
+// Keep like-colored chips together, shortest first; TSC has no numeric duration code.
+const FILTER_GROUP_ORDER = { regular: 0, long: 1, special: 2 };
+const filterDuration = raw => raw === 'Satipatthana' ? 8 : parseInt(raw, 10) || Infinity;
+const FILTER_TYPES = [...TYPES].sort(([a], [b]) => FILTER_GROUP_ORDER[typeClass(a)] - FILTER_GROUP_ORDER[typeClass(b)]
+  || filterDuration(a) - filterDuration(b));
 
 const svg = paths => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 const ICONS = {
@@ -336,7 +355,259 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<':
 // fold lowercases and strips diacritics, so "dhara" finds "Dhamma Dharā".
 const fold = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const textOf = html => new DOMParser().parseFromString(html, 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
-const flag = cc => /^[a-z]{2}$/i.test(cc || '') ? String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 0x1F1A5 + ch.charCodeAt(0))) : '🏳️';
+const flag = cc => /^[a-z]{2}$/i.test(cc || '') ? `<img src="assets/flags/${cc.toLowerCase()}.svg" alt="">` : '?';
+
+// The Where control stores stable place keys; typing only searches suggestions.
+const places = PLACES.map(([kind, id, text, texts, tag, count]) => ({
+  kind, id, text, texts, tag, count, key: `${kind}_${id}`,
+  search: [...texts, text].map(fold),
+}));
+const placeByKey = new Map(places.map(p => [p.key, p]));
+const placeInput = $('#place-search'), placeOptions = $('#place-options');
+const PLACE_GROUPS = [
+  ['region', 'Regions'], ['state', 'States and provinces'],
+  ['location', 'Centers and non-centers'], ['sublocation', 'Venues'],
+];
+let suggestions = [], activePlace = -1;
+
+function chosenPlaces() {
+  return [...new Set(form.elements.where.value.split(','))].map(k => placeByKey.get(k)).filter(Boolean);
+}
+
+function placeMatches(c, p) {
+  const l = c.loc;
+  if (p.kind === 'region') return (LOCATION_REGIONS[l.id] || []).includes(p.id);
+  if (p.kind === 'location') return l.id === p.id;
+  if (p.kind === 'sublocation') return l.subId === p.id;
+  if (p.kind === 'state') {
+    const state = p.texts[0];
+    const country = p.text.slice(state.length).replace(/^,\s*/, '');
+    return fold(l.state) === fold(state) && fold(l.country) === fold(country);
+  }
+  return false;
+}
+
+// Every word must match. Prefer an exact phrase, prefix, word starts, then substrings.
+function placeRank(p, query, words) {
+  if (!words.every(w => p.search.some(t => t.includes(w)))) return Infinity;
+  if (p.search.includes(query)) return 0;
+  if (p.search.some(t => t.startsWith(query))) return 1;
+  if (words.every(w => p.search.some(t => t.split(/[^\p{L}\p{N}]+/u).some(s => s.startsWith(w))))) return 2;
+  return 3;
+}
+
+// Fold each original character separately to retain its position when highlighting accents.
+function highlightPlace(text, words) {
+  if (!words.length) return esc(text);
+  let folded = '', positions = [];
+  for (let i = 0; i < text.length;) {
+    const ch = String.fromCodePoint(text.codePointAt(i)), normalized = fold(ch);
+    for (const ignored of normalized) positions.push([i, i + ch.length]);
+    folded += normalized;
+    i += ch.length;
+  }
+  const marked = new Set();
+  for (const word of words) {
+    let start = folded.indexOf(word);
+    while (start !== -1) {
+      for (let j = start; j < start + word.length; j++) {
+        if (positions[j]) for (let k = positions[j][0]; k < positions[j][1]; k++) marked.add(k);
+      }
+      start = folded.indexOf(word, start + 1);
+    }
+  }
+  let html = '', bold = false;
+  for (let i = 0; i < text.length; i++) {
+    const next = marked.has(i);
+    if (next !== bold) html += next ? '<b>' : '</b>';
+    bold = next;
+    html += esc(text[i]);
+  }
+  return html + (bold ? '</b>' : '');
+}
+
+function renderPlaceChips() {
+  const chosen = chosenPlaces();
+  form.elements.where.value = chosen.map(p => p.key).join(',');
+  $('#place-chips').innerHTML = chosen.map(p => `<span class="place-chip" data-tip="${esc(p.text)}"><span>${esc(p.kind === 'region' ? p.text : p.texts[0])}</span><button type="button" class="place-remove" data-remove-place="${p.key}" aria-label="${esc(`Remove ${p.text}`)}">×</button></span>`).join('');
+  placeInput.placeholder = chosen.length ? 'add a place' : 'country, state or center';
+}
+
+function activatePlace(index, scroll = false) {
+  activePlace = index;
+  for (const option of placeOptions.querySelectorAll('[role=option]')) {
+    option.setAttribute('aria-selected', String(+option.dataset.index === index));
+  }
+  const option = placeOptions.querySelector(`[data-index="${index}"]`);
+  if (option) {
+    placeInput.setAttribute('aria-activedescendant', option.id);
+    if (scroll) option.scrollIntoView({ block: 'nearest' });
+  } else placeInput.removeAttribute('aria-activedescendant');
+}
+
+function showPlaces() {
+  const query = fold(placeInput.value.trim()), words = query.split(/\s+/).filter(Boolean);
+  const chosen = new Set(chosenPlaces().map(p => p.key));
+  const ranked = places.filter(p => !chosen.has(p.key) && (words.length || p.tag === 'continent'))
+    .map(p => ({ p, rank: words.length ? placeRank(p, query, words) : 0 }))
+    .filter(item => Number.isFinite(item.rank))
+    .sort((a, b) => a.rank - b.rank || (a.p.kind === 'region' ? 0 : 1) - (b.p.kind === 'region' ? 0 : 1)
+      || (a.p.kind === 'region' && b.p.kind === 'region' ? b.p.count - a.p.count : 0) || a.p.text.localeCompare(b.p.text));
+  suggestions = [];
+  placeOptions.innerHTML = PLACE_GROUPS.map(([kind, label]) => {
+    const group = ranked.filter(item => item.p.kind === kind);
+    if (!group.length) return '';
+    const options = group.slice(0, 8).map(({ p }) => {
+      const index = suggestions.push(p) - 1;
+      return `<div class="place-option" id="place-option-${p.key}" role="option" aria-selected="false" data-index="${index}"><span>${highlightPlace(p.text, words)}</span><span class="place-tag">${esc(p.tag)}${p.kind === 'region' ? `<br>${p.count} location${p.count === 1 ? '' : 's'}` : ''}</span></div>`;
+    }).join('');
+    return `<div role="group" aria-label="${label}"><div class="place-group" aria-hidden="true">${label}</div>${options}${group.length > 8 ? `<div class="place-more">${group.length - 8} more — keep typing</div>` : ''}</div>`;
+  }).join('') || '<div class="place-empty">No matching places.</div>';
+  placeOptions.hidden = false;
+  placeInput.setAttribute('aria-expanded', 'true');
+  activatePlace(suggestions.length ? 0 : -1);
+  const r = $('#where-box').getBoundingClientRect();
+  placeOptions.style.left = Math.min(0, innerWidth - r.left - placeOptions.offsetWidth - 16) + 'px';
+  $('#place-status').textContent = `${ranked.length} place${ranked.length === 1 ? '' : 's'} found${ranked.length > suggestions.length ? `, ${suggestions.length} shown. Keep typing to narrow the list` : ''}.`;
+}
+
+function closePlaces() {
+  placeOptions.hidden = true;
+  placeInput.setAttribute('aria-expanded', 'false');
+  placeInput.removeAttribute('aria-activedescendant');
+  activePlace = -1;
+}
+
+function changePlaces(keys) {
+  form.elements.where.value = keys.join(',');
+  renderPlaceChips();
+  render();
+}
+
+function pickPlace(p) {
+  if (!p) return;
+  changePlaces([...chosenPlaces().map(p => p.key), p.key]);
+  placeInput.value = '';
+  placeInput.focus();
+  closePlaces();
+  $('#place-status').textContent = `${p.text} added.`;
+}
+
+placeInput.addEventListener('focus', showPlaces);
+placeInput.addEventListener('input', e => { e.stopPropagation(); showPlaces(); });
+placeInput.addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (placeOptions.hidden) { showPlaces(); return; }
+    if (suggestions.length) activatePlace((activePlace + (e.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length, true);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (!placeOptions.hidden) pickPlace(suggestions[activePlace]);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closePlaces();
+  } else if (e.key === 'Backspace' && !placeInput.value && chosenPlaces().length) {
+    e.preventDefault();
+    const chosen = chosenPlaces(), removed = chosen.pop();
+    changePlaces(chosen.map(p => p.key));
+    showPlaces();
+    $('#place-status').textContent = `${removed.text} removed.`;
+  }
+});
+placeOptions.addEventListener('pointerdown', e => { if (e.target.closest('[role=option]')) e.preventDefault(); });
+placeOptions.addEventListener('click', e => {
+  const option = e.target.closest('[role=option]');
+  if (option) pickPlace(suggestions[+option.dataset.index]);
+});
+placeOptions.addEventListener('mousemove', e => {
+  const option = e.target.closest('[role=option]');
+  if (option && +option.dataset.index !== activePlace) activatePlace(+option.dataset.index);
+});
+$('#place-chips').addEventListener('click', e => {
+  const button = e.target.closest('[data-remove-place]');
+  if (!button) return;
+  changePlaces(chosenPlaces().filter(p => p.key !== button.dataset.removePlace).map(p => p.key));
+  placeInput.focus();
+  showPlaces();
+});
+$('#where-box').addEventListener('focusout', e => { if (!e.currentTarget.contains(e.relatedTarget)) closePlaces(); });
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#where-box')) closePlaces(); });
+
+// Desktop headings and rows use the same order and track widths. Phone rows use named areas.
+const DISPLAY_COLUMNS = {
+  location: { label: 'Location', width: 'minmax(0, 1fr)' },
+  dates: { label: 'Dates', width: '120px' },
+  type: { label: 'Type', width: '84px' },
+  lights: { label: 'Availability', width: '108px' },
+  apply: { label: 'Apply', width: '84px' },
+  links: { label: 'Links', width: '48px' },
+};
+let columnOrder = Object.keys(DISPLAY_COLUMNS);
+try {
+  const saved = JSON.parse(localStorage.getItem('sit.columns'));
+  if (Array.isArray(saved) && saved.length === columnOrder.length && new Set(saved).size === columnOrder.length && saved.every(k => Object.hasOwn(DISPLAY_COLUMNS, k))) columnOrder = saved;
+} catch { /* blocked storage or an invalid saved order: use the default */ }
+
+function saveColumnOrder(next, moved) {
+  columnOrder = next;
+  try { localStorage.setItem('sit.columns', JSON.stringify(next)); } catch { /* lasts until reload */ }
+  render();
+  list.querySelector(`.column-head[data-column="${moved}"]`)?.focus({ preventScroll: true });
+  $('#column-status').textContent = `${DISPLAY_COLUMNS[moved].label} moved to column ${next.indexOf(moved) + 1} of ${next.length}.`;
+}
+
+let draggedColumn = null;
+function clearDrag() {
+  for (const el of list.querySelectorAll('.column-head')) { delete el.dataset.drop; el.classList.remove('dragging'); }
+}
+list.addEventListener('dragstart', e => {
+  const heading = e.target.closest('.column-head');
+  if (!heading) return;
+  draggedColumn = heading.dataset.column;
+  e.dataTransfer.setData('text/plain', draggedColumn);
+  e.dataTransfer.effectAllowed = 'move';
+  heading.classList.add('dragging');
+  hideTip();
+});
+list.addEventListener('dragover', e => {
+  const heading = e.target.closest('.column-head');
+  if (!heading || !draggedColumn) return;
+  e.preventDefault();
+  for (const el of list.querySelectorAll('[data-drop]')) delete el.dataset.drop;
+  if (heading.dataset.column === draggedColumn) return;
+  const r = heading.getBoundingClientRect();
+  heading.dataset.drop = e.clientX < r.left + r.width / 2 ? 'before' : 'after';
+  e.dataTransfer.dropEffect = 'move';
+});
+list.addEventListener('dragleave', e => {
+  const heading = e.target.closest('.column-head');
+  if (heading && !heading.contains(e.relatedTarget)) delete heading.dataset.drop;
+});
+list.addEventListener('drop', e => {
+  const heading = e.target.closest('.column-head');
+  if (!heading || !draggedColumn) return;
+  e.preventDefault();
+  const moved = draggedColumn, side = heading.dataset.drop, target = heading.dataset.column;
+  clearDrag();
+  draggedColumn = null;
+  if (moved === target || !side) return;
+  const next = columnOrder.filter(k => k !== moved);
+  next.splice(next.indexOf(target) + (side === 'after' ? 1 : 0), 0, moved);
+  saveColumnOrder(next, moved);
+});
+list.addEventListener('dragend', () => { clearDrag(); draggedColumn = null; });
+list.addEventListener('keydown', e => {
+  const heading = e.target.closest('.column-head');
+  if (!heading || !e.altKey || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  e.preventDefault();
+  const key = heading.dataset.column, index = columnOrder.indexOf(key);
+  const destination = index + (e.key === 'ArrowLeft' ? -1 : 1);
+  if (destination < 0 || destination >= columnOrder.length) return;
+  const next = [...columnOrder];
+  [next[index], next[destination]] = [next[destination], next[index]];
+  saveColumnOrder(next, key);
+});
 
 const ymd = s => s.split('-').map(Number);
 // dateRange leaves out the year, which the month headings show: "Nov 18 – 29", "Nov 25 – Dec 6".
@@ -381,7 +652,7 @@ function matches(c, f) {
   if (!TYPE.has(c.type) || (f.types && !f.types.split(',').includes(TYPE.get(c.type).short))) return false;
   if (f.centers && !c.loc.center) return false;
   if (f.lang && !c.langs.includes(f.lang)) return false;
-  if (f.where.trim()) return fold(`${c.loc.name} ${c.loc.venue} ${c.loc.place}`).includes(fold(f.where.trim()));
+  if (f.where) return f.where.split(',').some(key => placeByKey.has(key) && placeMatches(c, placeByKey.get(key)));
   return true;
 }
 
@@ -404,6 +675,9 @@ function setFilters(f) {
     if (typeof d === 'boolean') form.elements[k].checked = f[k];
     else form.elements[k].value = f[k];
   }
+  renderPlaceChips();
+  placeInput.value = '';
+  closePlaces();
 }
 function toFragment(f) {
   const p = new URLSearchParams();
@@ -420,32 +694,35 @@ const link = (href, label, icon) => href ? `<a class="icon" href="${esc(href)}" 
 
 function rowHTML(c, avail, f) {
   const l = c.loc;
-  const cells = avail === 'soon' ? {} : lights(c);
+  const statuses = avail === 'soon' ? {} : lights(c);
   const reg = avail === 'soon'
     ? `<span class="opens" data-tip="Registration opens ${esc(longDate(c.enroll))}"><span>${MON[ymd(c.enroll)[1] - 1]}</span><span>${ymd(c.enroll)[2]}</span></span>`
-    : `<a href="${esc(c.apply)}" target="_blank" rel="noopener">Apply</a>`;
+    : `<a href="${esc(c.apply)}" target="_blank" rel="noopener" aria-label="${esc(`Apply for ${TYPE.get(c.type).name} at ${l.name}, ${longDate(c.start)}`)}">Apply</a>`;
   const cell = k => {
-    const s = cells[k], hl = k === f.as ? ' hl' : '';
+    const s = statuses[k], hl = k === f.as ? ' hl' : '';
     return s
       ? `<span class="l${hl}" data-k="${k}" data-tip="${esc(`${COLUMN_NAME[k]}: ${s.status}`)}"><i class="light ${LIGHTS[s.color] || ''}"></i></span>`
       : `<span class="l${hl}" data-k="${k}"></span>`;
   };
   const lightCells = GROUPS.map(([, , keys]) => `<span class="grp">${keys.map(cell).join('')}</span>`).join('');
-  return `<div class="row" data-id="${c.id}">
-    <span class="flag" role="img" aria-label="${esc(l.venue ? `${l.venue}, ${l.place}` : l.place)}" data-tip="${esc(l.venue ? `${l.venue}\n${l.place}` : l.place)}">${flag(l.cc)}</span>
-    <span class="who">${l.web ? `<a class="name" href="${esc(l.web)}" target="_blank" rel="noopener"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</a>` : `<span class="name"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</span>`}<span class="kind ${l.center ? 'center' : 'noncenter'}" data-tip="${l.center ? 'center' : 'non-center'}"></span></span>
-    <span class="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>
-    <span class="type"><span data-tip="${esc(`${TYPE.get(c.type).name}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span>${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>
-    <span class="lights">${lightCells}</span>
-    <span class="reg">${reg}</span>
-    <span class="links">${link(l.schedule, 'Course schedule', ICONS.schedule)}</span>
-  </div>`;
+  const cells = {
+    location: `<span class="who" data-column="location"><span class="flag" role="img" aria-label="${esc(l.venue ? `${l.venue}, ${l.place}` : l.place)}" data-tip="${esc(l.venue ? `${l.venue}\n${l.place}` : l.place)}">${flag(l.cc)}</span>${l.web ? `<a class="name" href="${esc(l.web)}" target="_blank" rel="noopener"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</a>` : `<span class="name"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</span>`}${l.center ? '' : '<span class="kind noncenter" data-tip="non-center"></span>'}</span>`,
+    dates: `<span class="dates" data-column="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>`,
+    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span></span>`,
+    lights: `<span class="lights" data-column="lights">${lightCells}</span>`,
+    apply: `<span class="reg" data-column="apply">${reg}</span>`,
+    links: `<span class="links" data-column="links">${link(l.schedule, 'Course schedule', ICONS.schedule)}${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
+  };
+  return `<div class="row" data-id="${c.id}">${columnOrder.map(key => cells[key]).join('')}</div>`;
 }
 
 function headHTML(f) {
   const cols = GROUPS.map(([label, title, keys]) => `<span class="grp"><b data-tip="${title}">${label}</b>${keys.map(k =>
     `<span class="l${k === f.as ? ' hl' : ''}" data-tip="${COLUMN_NAME[k]}">${k.slice(-1)}</span>`).join('')}</span>`).join('');
-  return `<div class="row head"><span></span><span>Location</span><span>Dates</span><span>Type</span><span class="lights">${cols}</span><span class="regh">Apply</span><span></span></div>`;
+  return `<div class="row head">${columnOrder.map(key => {
+    const label = DISPLAY_COLUMNS[key].label;
+    return `<button type="button" class="column-head${key === 'lights' ? ' lights' : ''}" data-column="${key}" draggable="true" aria-label="${label}. Drag to reorder, or use Alt and left or right arrow." aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" data-tip="${label}\nDrag to reorder · Alt + ← / →">${key === 'lights' ? cols : esc(label)}</button>`;
+  }).join('')}</div>`;
 }
 
 const openNotes = new Set();
@@ -453,16 +730,16 @@ const openNotes = new Set();
 function render() {
   hidePhoto();
   hideTip();
+  list.style.setProperty('--columns', columnOrder.map(k => DISPLAY_COLUMNS[k].width).join(' '));
   const f = readFilters();
+  list.dataset.as = f.as;
   try { history.replaceState(null, '', '#' + toFragment(f)); } catch { /* not allowed for some file:// URLs */ }
 
   const shown = [];
-  let hidden = 0;
   for (const c of SAMPLE_COURSES) {
     if (!matches(c, f)) continue;
     const avail = availability(c, f);
     if (avail) shown.push([c, avail]);
-    else hidden++;
   }
   shown.sort(([a], [b]) => a.start.localeCompare(b.start) || a.loc.name.localeCompare(b.loc.name));
 
@@ -595,7 +872,13 @@ form.addEventListener('submit', e => e.preventDefault());
 addEventListener('hashchange', () => { setFilters(fromFragment()); render(); });
 
 // Keep the column header row just below the filter bar while scrolling.
-new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', $('.bar').offsetHeight + 'px')).observe($('.bar'));
+const measureHeaders = () => {
+  document.documentElement.style.setProperty('--bar-h', $('.bar').offsetHeight + 'px');
+  document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.offsetHeight ?? 0) + 'px');
+};
+const layoutObserver = new ResizeObserver(measureHeaders);
+layoutObserver.observe($('.bar'));
+layoutObserver.observe(list);
 
 // Theme switch. The choice is remembered in this browser; without one the page follows the system.
 const themeButton = $('#theme');
@@ -624,8 +907,8 @@ showThemeButton();
 
 // Start: notes flags, the language list and place suggestions come from the data.
 for (const c of SAMPLE_COURSES) c.hasNotes = textOf(c.comments) !== '';
-$('#types').innerHTML = TYPES.map(([, short, name]) =>
-  `<label class="chip" data-tip="${esc(name)}"><input type="checkbox" name="types" value="${esc(short)}"><span>${esc(short)}</span></label>`).join('');
+$('#types').innerHTML = FILTER_TYPES.map(([raw, short]) =>
+  `<label class="chip ${typeClass(raw)}" data-tip="${esc(typeTip(raw))}"><input type="checkbox" name="types" value="${esc(short)}"><span>${esc(short)}</span></label>`).join('');
 form.elements.lang.innerHTML = '<option value="">any</option>'
   + [...new Set(SAMPLE_COURSES.flatMap(c => c.langs))].sort().map(l => `<option>${esc(l)}</option>`).join('');
 setFilters(fromFragment());
