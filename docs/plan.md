@@ -8,7 +8,8 @@ The current implementation and visual decisions are documented in [web/design.md
 
 - `web/mockup.html` runs entirely in the browser on a fixed snapshot in `web/mockup-data.js`.
 - Place chips, course and availability filters, URL sharing, reorderable columns, responsive
-  layouts and light/dark themes are implemented. The sample date, 2026-11-13, stands in for today.
+  layouts and light/dark themes are implemented. From defaults to the viewer's current local date;
+  the sample data remains a snapshot from 2026-11-13.
 - Square flags are local SVG assets. Location photos are fetched on hover from dhamma.org.
 - The Go CLI, module and index package have been removed. No live-data backend exists yet.
 
@@ -25,8 +26,8 @@ The current implementation and visual decisions are documented in [web/design.md
 4. Fetch result pages sequentially with a short pause. One query returns at most 100 courses;
    split date ranges when `total_rows` exceeds that limit, deduplicate by course ID, and stream
    results to the page. Consider a short in-memory cache.
-5. Add loading, error, empty and partial-result states, cancel stale searches, and use the real
-   current date in live mode.
+5. Add loading, error, empty and partial-result states and cancel stale searches. The mockup's
+   From filter already defaults to the viewer's real local date.
 6. Fetch any needed place search texts, IDs, course types and directory region relationships
    with a JavaScript script. Keep generated metadata separate from live course availability.
 

@@ -10,7 +10,8 @@ its index package have been removed.
 ## Filter bar (sticky, top)
 
 - **Where**: places as chips; see [Where box](#where-box). Courses in any chosen place show.
-- **From**: start date, default today. No end date: every course from then on.
+- **From**: start date, default the viewer's current local calendar date. Preserve a date
+  explicitly supplied in the URL fragment. No end date: every course from then on.
 - **Course**: toggle chips; any number can be on, and none on means all. The page covers only:
 
   | Chip | Full name | `raw_course_type` | Search ID |
@@ -18,9 +19,8 @@ its index package have been removed.
   | 10D | 10-day | `10-Day` | 3 |
   | 10D OS | 10-day for old students | `10-DayOSC` | 28 |
   | 10D SPCL | Special 10-day | `10-DaySpecial` | 6 |
-  | 14D | 14-day gratitude course | `14-DayGratitude` | 66 |
+  | 14D/TSC | 14-day gratitude / teacher's self course | `14-DayGratitude`, `TSC` | 66 / 21 (27 unused) |
   | 20D / 30D / 45D / 60D | 20/30/45/60-day | `20-DayOSC` … `60-DayOSC` | 4 / 11 / 12 / 23 |
-  | TSC | Teacher's self course | `TSC` | 21 (27 unused) |
   | EXEC | Executive course | `10-DayExecutive` | 1 |
   | STP | Satipaṭṭhāna Sutta course | `Satipatthana` | 10 |
   | 3D | 3-day | `3-DayOSC` | 9 |
@@ -29,9 +29,11 @@ its index package have been removed.
   7D TEEN, CHLD, CHLD/TEEN, TEEN.
   Chips are grouped by their color, then by duration, in this order:
   - Neutral: 3D, 10D, 10D OS, EXEC.
+  - Teal: STP, 14D/TSC.
   - Violet: 10D SPCL, 20D, 30D, 45D, 60D.
-  - Teal: STP, 14D, TSC. TSC has no numeric duration code and comes last.
   No visual separators are needed between these groups.
+  `14D/TSC` is one filter matching both upstream course types. Existing links with `types=14D`
+  or `types=TSC` restore that combined chip. Rows retain their own 14D or TSC code and full name.
 - **As**: anyone, or new / old / server × male / female. This narrows "can sign up" to that
   position, highlights its light column, and enlarges its lights from 8px to 10px. Other
   positions' lights are dimmed to 28% opacity. Anyone restores all lights to their normal size
@@ -52,8 +54,9 @@ its index package have been removed.
 - **Summary line:** "N courses you can sign up for", plus a legend: the blue non-center dot and
   the open / wait list / long wait list / closed lights.
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
-  bar, and the month headings ("NOVEMBER 2026 63") stick under the column headings. Rows sort
-  by start date, then name.
+  bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
+  Keep full month names and align these group headings to the left edge of the table, rather
+  than the Dates column. Rows sort by start date, then name.
 - **Rows:** compact, one 32px line each on wide screens.
 - **Columns** (default order), rearrangeable by dragging their headings. A marker shows which
   side of a heading the column will land on. Focused headings also support Alt + Left/Right.
@@ -62,6 +65,7 @@ its index package have been removed.
   1. **Location**:
      - Shows a square flag, then the name without its "Dhamma " prefix. Only non-centers have
        a tiny faint blue dot; centers have no dot. The legend explains the non-center marker.
+     - Align the Location heading with the flag, at the left edge of the whole cell.
      - Flags are 16×16px local SVGs from `flag-icons` v7.3.2, with 2px corners and a fine edge.
        They use 78% opacity and 75% saturation to blend with the quiet rows; hovering restores
        their full color. The 29 countries in the snapshot are saved under `assets/flags/`, with
@@ -191,7 +195,8 @@ codes such as "WA" or "IN".
 - At 380px and below, filters use one column and row icons move below the lights. Avoid
   horizontal scrolling at phone widths. Keep controls and suggestion panels within the viewport.
 - Re-measure sticky offsets when the filter bar or list resizes, including when crossing the
-  breakpoint, so month headings never cover the desktop column headings.
+  breakpoint. Preserve fractional pixel heights and overlap adjacent sticky layers by 1px so
+  rows cannot peek through a rounding gap between the filters, column headings and month headings.
 
 ## Real implementation (next phase)
 
@@ -219,9 +224,9 @@ codes such as "WA" or "IN".
 - **Assets:** photos are hotlinked from dhamma.org; the server could proxy them. Flags are local
   SVGs and render consistently across operating systems. Download any newly needed flags when
   expanding the snapshot or preparing live data.
-- **Live UI:** add loading, error and partial-result states, cancel superseded requests, and
-  replace the mockup's fixed date with today's date in live mode. A backend framework and
-  hosting provider have not been chosen.
+- **Live UI:** add loading, error and partial-result states and cancel superseded requests.
+  The date filter already defaults to today's local date. A backend framework and hosting
+  provider have not been chosen.
 
 ## Status: where to pick up
 
@@ -234,4 +239,4 @@ still uses sample data. `docs/plan.md` now describes the website and its next im
 
 **Mockup data:** `mockup-data.js` is a snapshot taken from dhamma.org on 2026-11-13. It's built
 by `web/tools/mkdata.py` from saved pages: one `do_search` page per course type, plus the search
-and directory pages. The mockup uses that date as "today".
+and directory pages. The sample remains fixed, but the From filter defaults to today's local date.

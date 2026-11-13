@@ -118,17 +118,16 @@
   main { max-width: 1180px; margin: 0 auto; padding: 0 16px 32px; }
   .row { display: grid; grid-template-columns: var(--columns, minmax(0, 1fr) 120px 84px 108px 84px 48px); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
   .row:not(.head):hover { background: var(--hover); }
-  .head { position: sticky; top: var(--bar-h, 0px); z-index: 5; align-items: end; padding-top: 6px; padding-bottom: 4px; background: var(--bg); color: var(--muted); font-size: 11.5px; font-weight: 600; }
+  .head { position: sticky; top: calc(var(--bar-h, 0px) - 1px); z-index: 5; align-items: end; padding-top: 6px; padding-bottom: 4px; background: var(--bg); color: var(--muted); font-size: 11.5px; font-weight: 600; }
   .head .l, .head b { cursor: help; }
   .column-head { position: relative; display: flex; align-items: end; min-width: 0; padding: 2px 0; border: 0; border-radius: 2px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: grab; }
   .column-head:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-  .column-head[data-column=location] { padding-left: 23px; }
   .column-head[data-column=type], .column-head[data-column=apply], .column-head[data-column=links] { justify-content: center; }
   .column-head.dragging { opacity: .35; }
   .column-head[data-drop=before] { box-shadow: -3px 0 var(--link); }
   .column-head[data-drop=after] { box-shadow: 3px 0 var(--link); }
-  h2 { position: sticky; top: calc(var(--bar-h, 0px) + var(--head-h, 0px)); z-index: 4; margin: 0; padding: 14px 8px 5px; background: var(--bg); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
-  h2 span { margin-left: 8px; font-weight: 400; color: var(--faint); }
+  h2 { position: sticky; top: calc(var(--bar-h, 0px) + var(--head-h, 0px) - 2px); z-index: 4; margin: 0; padding: 14px 8px 5px; background: var(--bg); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  h2 .count { margin-left: 8px; font-weight: 400; color: var(--faint); }
 
   .flag { display: grid; place-items: center; flex: none; width: 16px; height: 16px; overflow: hidden; border-radius: 2px; outline: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); outline-offset: -1px; background: var(--photo-bg); opacity: .78; filter: saturate(.75); cursor: default; }
   .flag:hover { opacity: 1; filter: none; }
@@ -295,8 +294,9 @@
 <script>
 'use strict';
 
-// The sample's fetch date stands in for today, so the mockup looks the same on any day.
-const TODAY = '2026-11-13';
+// Use the viewer's local calendar date; a UTC conversion can shift it by a day.
+const now = new Date();
+const TODAY = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MON = MONTHS.map(m => m.slice(0, 3));
 
@@ -332,11 +332,14 @@ const LONG_TYPES = new Set(['10-DaySpecial', '20-DayOSC', '30-DayOSC', '45-DayOS
 const SPECIAL_TYPES = new Set(['TSC', '14-DayGratitude', 'Satipatthana']);
 const typeClass = raw => LONG_TYPES.has(raw) ? 'long' : SPECIAL_TYPES.has(raw) ? 'special' : 'regular';
 const typeTip = raw => [TYPE.get(raw).name, LONG_TYPES.has(raw) ? 'Long course' : ''].filter(Boolean).join(' · ');
-// Keep like-colored chips together, shortest first; TSC has no numeric duration code.
-const FILTER_GROUP_ORDER = { regular: 0, long: 1, special: 2 };
+// Combine the two upstream 14-day codes in one filter; retain their own codes in rows.
+const filterTypeCode = raw => ['14-DayGratitude', 'TSC'].includes(raw) ? '14D/TSC' : TYPE.get(raw).short;
+const filterTypeTip = raw => raw === '14-DayGratitude' ? "14-day gratitude / teacher's self course" : typeTip(raw);
+// Keep like-colored chips together, shortest first, with teal before violet.
+const FILTER_GROUP_ORDER = { regular: 0, special: 1, long: 2 };
 const filterDuration = raw => raw === 'Satipatthana' ? 8 : parseInt(raw, 10) || Infinity;
-const FILTER_TYPES = [...TYPES].sort(([a], [b]) => FILTER_GROUP_ORDER[typeClass(a)] - FILTER_GROUP_ORDER[typeClass(b)]
-  || filterDuration(a) - filterDuration(b));
+const FILTER_TYPES = TYPES.filter(([raw]) => raw !== 'TSC').map(([raw]) => [raw, filterTypeCode(raw)])
+  .sort(([a], [b]) => FILTER_GROUP_ORDER[typeClass(a)] - FILTER_GROUP_ORDER[typeClass(b)] || filterDuration(a) - filterDuration(b));
 
 const svg = paths => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 const ICONS = {
@@ -649,7 +652,7 @@ function availability(c, f) {
 
 function matches(c, f) {
   if (c.start < f.from) return false;
-  if (!TYPE.has(c.type) || (f.types && !f.types.split(',').includes(TYPE.get(c.type).short))) return false;
+  if (!TYPE.has(c.type) || (f.types && !f.types.split(',').includes(filterTypeCode(c.type)))) return false;
   if (f.centers && !c.loc.center) return false;
   if (f.lang && !c.langs.includes(f.lang)) return false;
   if (f.where) return f.where.split(',').some(key => placeByKey.has(key) && placeMatches(c, placeByKey.get(key)));
@@ -668,7 +671,7 @@ function readFilters() {
   return f;
 }
 function setFilters(f) {
-  const types = new Set(f.types.split(','));
+  const types = new Set(f.types.split(',').map(code => ['14D', 'TSC'].includes(code) ? '14D/TSC' : code));
   for (const i of form.querySelectorAll('[name=types]')) i.checked = types.has(i.value);
   for (const [k, d] of Object.entries(DEFAULTS)) {
     if (k === 'types') continue;
@@ -752,11 +755,11 @@ function render() {
   list.innerHTML = shown.length
     ? headHTML(f) + [...months].map(([key, items]) => {
         const [y, m] = ymd(key);
-        return `<h2>${MONTHS[m - 1]} ${y}<span>${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}`;
+        return `<h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}`;
       }).join('')
     : '<p class="empty">No courses you can sign up for match these filters.</p>';
   // Month headings stick just below the column headings.
-  document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.offsetHeight ?? 0) + 'px');
+  document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.getBoundingClientRect().height ?? 0) + 'px');
   for (const id of openNotes) {
     const row = list.querySelector(`.row[data-id="${id}"]`);
     if (row) toggleNotes(row, true);
@@ -873,8 +876,9 @@ addEventListener('hashchange', () => { setFilters(fromFragment()); render(); });
 
 // Keep the column header row just below the filter bar while scrolling.
 const measureHeaders = () => {
-  document.documentElement.style.setProperty('--bar-h', $('.bar').offsetHeight + 'px');
-  document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.offsetHeight ?? 0) + 'px');
+  // Preserve fractional pixels, and overlap sticky layers by 1px to prevent scroll-through seams.
+  document.documentElement.style.setProperty('--bar-h', $('.bar').getBoundingClientRect().height + 'px');
+  document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.getBoundingClientRect().height ?? 0) + 'px');
 };
 const layoutObserver = new ResizeObserver(measureHeaders);
 layoutObserver.observe($('.bar'));
@@ -908,7 +912,7 @@ showThemeButton();
 // Start: notes flags, the language list and place suggestions come from the data.
 for (const c of SAMPLE_COURSES) c.hasNotes = textOf(c.comments) !== '';
 $('#types').innerHTML = FILTER_TYPES.map(([raw, short]) =>
-  `<label class="chip ${typeClass(raw)}" data-tip="${esc(typeTip(raw))}"><input type="checkbox" name="types" value="${esc(short)}"><span>${esc(short)}</span></label>`).join('');
+  `<label class="chip ${typeClass(raw)}" data-tip="${esc(filterTypeTip(raw))}"><input type="checkbox" name="types" value="${esc(short)}"><span>${esc(short)}</span></label>`).join('');
 form.elements.lang.innerHTML = '<option value="">any</option>'
   + [...new Set(SAMPLE_COURSES.flatMap(c => c.langs))].sort().map(l => `<option>${esc(l)}</option>`).join('');
 setFilters(fromFragment());

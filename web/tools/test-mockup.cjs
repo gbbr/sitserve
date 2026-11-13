@@ -16,7 +16,8 @@ async function main() {
   });
   let passed = 0;
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light' });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light', timezoneId: 'UTC' });
+    await page.clock.setFixedTime(new Date('2026-11-13T12:00:00Z'));
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const url = pathToFileURL(path.join(__dirname, '..', 'mockup.html')).href;
@@ -42,11 +43,24 @@ async function main() {
     const ids = cs => cs.map(c => c.id).sort((a, b) => a - b);
     const defaultOrder = ['location', 'dates', 'type', 'lights', 'apply', 'links'];
 
+    await check('From defaults to the local day and preserves an explicit shared date', async () => {
+      for (const [timezoneId, expected] of [['America/Los_Angeles', '2026-11-13'], ['Pacific/Auckland', '2026-11-14']]) {
+        const localPage = await browser.newPage({ timezoneId });
+        try {
+          await localPage.clock.setFixedTime(new Date('2026-11-14T00:30:00Z'));
+          await localPage.goto(url);
+          assert.equal(await localPage.locator('[name=from]').inputValue(), expected);
+          await localPage.goto(url + '#from=2026-12-01');
+          assert.equal(await localPage.locator('[name=from]').inputValue(), '2026-12-01');
+        } finally { await localPage.close(); }
+      }
+    });
+
     await check('desktop grid, type groups, buttons, icons and local square flags', async () => {
       assert.equal(baselineIDs.length, 137);
       assert.deepEqual(await order(), defaultOrder);
       assert.deepEqual(await page.locator('#types input').evaluateAll(inputs => inputs.map(i => i.value)),
-        ['3D', '10D', '10D OS', 'EXEC', '10D SPCL', '20D', '30D', '45D', '60D', 'STP', '14D', 'TSC']);
+        ['3D', '10D', '10D OS', 'EXEC', 'STP', '14D/TSC', '10D SPCL', '20D', '30D', '45D', '60D']);
       assert.equal(await page.locator('.kind.center').count(), 0);
       assert.equal(await page.locator('.row[data-id] .kind.noncenter').count(), baseline.filter(c => !c.loc.center).length);
       assert.ok(await page.locator('.reg a').first().evaluate(a => getComputedStyle(a).height === '24px'));
@@ -57,6 +71,23 @@ async function main() {
       await page.waitForFunction(() => [...document.querySelectorAll('.flag img')].every(img => img.complete));
       assert.ok(await page.locator('.flag img').evaluateAll(imgs => imgs.every(img => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)));
       assert.ok(await page.locator('.type').first().evaluate(el => getComputedStyle(el).justifyContent === 'center'));
+    });
+
+    await check('combined 14D/TSC filter and legacy links select both course types', async () => {
+      const combinedIDs = ids(baseline.filter(c => ['14-DayGratitude', 'TSC'].includes(c.type)));
+      assert.ok(combinedIDs.length > 0);
+      await page.locator('#types').getByText('14D/TSC', { exact: true }).click();
+      await page.waitForFunction(() => [...document.querySelectorAll('.type-code')].every(el => ['14D', 'TSC'].includes(el.textContent)));
+      assert.deepEqual(await rowIDs(), combinedIDs);
+      await page.reload();
+      assert.equal(await page.locator('[name=types][value="14D/TSC"]').isChecked(), true);
+      assert.deepEqual(await rowIDs(), combinedIDs);
+      for (const code of ['14D', 'TSC']) {
+        await load('types=' + code);
+        assert.equal(await page.locator('[name=types][value="14D/TSC"]').isChecked(), true);
+        assert.deepEqual(await rowIDs(), combinedIDs);
+      }
+      await load();
     });
 
     await check('grouped suggestions, accents, multiword matching and no matches', async () => {
@@ -164,7 +195,7 @@ async function main() {
     await check('no horizontal overflow at phone, breakpoint and desktop widths', async () => {
       for (const width of [320, 375, 390, 600, 820, 821, 1024, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
-        await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--head-h').trim() === (document.querySelector('.head')?.offsetHeight || 0) + 'px');
+        await page.waitForFunction(() => Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--head-h')) - (document.querySelector('.head')?.getBoundingClientRect().height || 0)) < .01);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${width}px`);
         assert.equal(await page.locator('.head').isVisible(), width > 820);
         await search.focus();
@@ -182,6 +213,29 @@ async function main() {
           return Math.abs(r.top + r.height / 2 - center) < 1;
         });
       }));
+    });
+
+    await check('sticky headers overlap without a seam and titles stay aligned', async () => {
+      for (const width of [821, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.evaluate(() => scrollTo(0, 600));
+        await page.waitForFunction(() => scrollY === 600
+          && Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) - document.querySelector('.bar').getBoundingClientRect().height) < .01);
+        const dimensions = await page.evaluate(() => {
+          const bar = document.querySelector('.bar').getBoundingClientRect();
+          const head = document.querySelector('.head').getBoundingClientRect();
+          const month = document.querySelector('h2').getBoundingClientRect();
+          const location = document.querySelector('.column-head[data-column=location]').getBoundingClientRect();
+          const flag = document.querySelector('.row[data-id] .flag').getBoundingClientRect();
+          return { barGap: head.top - bar.bottom, monthGap: month.top - head.bottom, locationX: location.left, flagX: flag.left };
+        });
+        assert.ok(dimensions.barGap <= 0 && dimensions.barGap >= -1.1, `filter seam at ${width}px: ${JSON.stringify(dimensions)}`);
+        assert.ok(dimensions.monthGap <= 0 && dimensions.monthGap >= -1.1, `month seam at ${width}px: ${JSON.stringify(dimensions)}`);
+        assert.equal(dimensions.locationX, dimensions.flagX);
+      }
+      assert.match(await page.locator('h2').first().textContent(), /^2026 November/);
+      if (process.env.SIT_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SIT_SCREENSHOT_DIR, 'sit-scroll.png') });
+      await page.evaluate(() => scrollTo(0, 0));
     });
 
     await check('theme choice persists and both themes render', async () => {
