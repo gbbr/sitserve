@@ -26,7 +26,20 @@ async function main() {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const url = server.url;
-    const submit = async () => { await page.locator('#search').click(); await page.waitForFunction(() => !document.querySelector('#search').disabled); };
+    const expandFilters = async () => {
+      if (await page.locator('#filter-toggle').getAttribute('aria-expanded') === 'false') await page.locator('#filter-toggle').click();
+      await page.waitForFunction(() => !document.querySelector('#filter-panel').hasAttribute('data-animating'));
+    };
+    const collapseFilters = async () => {
+      if (await page.locator('#filter-toggle').getAttribute('aria-expanded') === 'true') await page.locator('#filter-toggle').click();
+      await page.waitForFunction(() => !document.querySelector('#filter-panel').hasAttribute('data-animating'));
+    };
+    const submit = async ({ edit = true } = {}) => {
+      await expandFilters();
+      await page.locator('#search').click();
+      await page.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
+      if (edit) await expandFilters();
+    };
     const load = async fragment => { await page.goto(url + (fragment ? '#' + fragment : '')); await submit(); };
     const reload = async () => { await page.reload(); await submit(); };
     const rowIDs = () => page.locator('.row[data-id]').evaluateAll(rows => rows.map(r => +r.dataset.id).sort((a, b) => a - b));
@@ -44,10 +57,37 @@ async function main() {
     await check('page load waits for an explicit Search', async () => {
       await page.goto(url);
       assert.equal(await page.locator('.row[data-id]').count(), 0);
-      assert.equal(await page.locator('#summary').innerText(), 'Ready to search');
+      assert.equal(await page.locator('.summary').isVisible(), false);
+      assert.equal(await page.locator('footer').isVisible(), false);
+      assert.equal(await page.locator('#list').innerText(), 'Choose your filters and press Search to find up to 50 matching courses.');
       assert.match(await page.locator('#list').innerText(), /press Search/);
       assert.ok(await page.locator('#search').isVisible());
-      await submit();
+      assert.ok(await page.locator('#filter-toggle').isVisible());
+      assert.equal(await page.locator('#filter-toggle svg').count(), 1);
+      assert.equal(await page.locator('#filter-toggle').innerText(), '');
+      assert.equal(await page.locator('#filter-toggle').getAttribute('aria-label'), 'Hide filters');
+      if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-initial.png') });
+      const expandedHeight = (await page.locator('.bar').boundingBox()).height;
+      await page.locator('#search').click();
+      await page.waitForFunction(() => !document.querySelector('#search').disabled);
+      assert.ok(await page.locator('.row[data-id]').count() > 0);
+      assert.ok(await page.locator('#place-search').isVisible(), 'results appear before filters close');
+      await page.waitForFunction(() => document.querySelector('#filter-panel').dataset.animating === 'true');
+      await page.waitForFunction(() => {
+        const opacity = +getComputedStyle(document.querySelector('#filter-controls')).opacity;
+        return opacity > .05 && opacity < .95;
+      });
+      await page.waitForFunction(() => document.querySelector('#filter-controls').hidden);
+      assert.equal(await page.locator('#filter-controls').isVisible(), false);
+      assert.ok(await page.locator('.summary').isVisible());
+      assert.ok(await page.locator('footer').isVisible());
+      assert.equal(await page.locator('#search').isVisible(), false);
+      assert.equal(await page.locator('#filter-toggle').getAttribute('aria-label'), 'Edit filters');
+      assert.equal(await page.locator('#filter-summary [data-filter=where]').innerText(), 'Everywhere');
+      assert.equal(await page.locator('#filter-summary [data-filter=from]').innerText(), 'From Nov 14, 2026');
+      assert.equal(await page.locator('#filter-summary [data-filter=types]').innerText(), 'All courses');
+      assert.ok((await page.locator('.bar').boundingBox()).height < expandedHeight - 40);
+      await expandFilters();
     });
     const baselineIDs = await rowIDs();
     const { normalize } = await import('../../worker/normalize.js');
@@ -71,7 +111,7 @@ async function main() {
       }
     });
 
-    await check('desktop grid, type groups, buttons, icons and local square flags', async () => {
+    await check('desktop grid, type groups, buttons, icons and local rectangular flags', async () => {
       assert.deepEqual(baselineIDs, expected.default);
       assert.match(await page.locator('#search-limit').innerText(), /first 50 matches/);
       assert.deepEqual(await order(), defaultOrder);
@@ -85,8 +125,57 @@ async function main() {
         return !note || (note.parentElement.dataset.column === 'links' && note === note.parentElement.lastElementChild);
       })));
       await page.waitForFunction(() => [...document.querySelectorAll('.flag img')].every(img => img.complete));
-      assert.ok(await page.locator('.flag img').evaluateAll(imgs => imgs.every(img => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)));
+      assert.ok(await page.locator('.flag img').evaluateAll(imgs => imgs.length > 0 && imgs.every(img => {
+        const rect = img.getBoundingClientRect();
+        return img.naturalWidth > 0 && Math.abs(img.naturalWidth / img.naturalHeight - 4 / 3) < .01
+          && rect.width === 16 && rect.height === 12;
+      })));
       assert.ok(await page.locator('.type').first().evaluate(el => getComputedStyle(el).justifyContent === 'center'));
+      assert.ok(await page.locator('.filter-row').evaluateAll(rows => rows.every(row => {
+        const cells = [...row.children].map(el => el.getBoundingClientRect());
+        return cells.every(r => Math.abs(r.top + r.height / 2 - cells[0].top - cells[0].height / 2) < 1);
+      })), 'desktop controls share their requested rows');
+      assert.ok(await page.locator('#filter-controls').evaluate(el => {
+        const search = el.querySelector('#search').getBoundingClientRect();
+        const text = el.querySelector('#search-status').getBoundingClientRect();
+        return Math.abs(search.right - el.getBoundingClientRect().right) < 1 && text.right <= search.left;
+      }), 'Search is right aligned with its text on the left');
+      if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-expanded.png') });
+    });
+
+    await check('auto-collapse preserves selected filters, and reopening keeps results and pending edits', async () => {
+      await page.goto(url + '#where=region_402&types=10D&as=OM&lang=en&centers=1&wait=0&soon=0');
+      const values = () => page.locator('#filters').evaluate(form => [...new FormData(form).entries()]);
+      const original = await values();
+      await submit({ edit: false });
+      const submittedIDs = await rowIDs();
+      assert.equal(await page.locator('#filter-summary [data-filter=where]').innerText(), 'Americas');
+      assert.equal(await page.locator('#filter-summary [data-filter=types]').innerText(), '10D');
+      assert.match(await page.locator('#filter-summary [data-filter=options]').innerText(), /Old male.*English.*Centers only.*No wait lists/s);
+      await page.locator('#filter-toggle').focus();
+      await page.keyboard.press('Enter');
+      await expandFilters();
+      assert.equal(await page.locator('#filter-toggle').getAttribute('aria-expanded'), 'true');
+      assert.deepEqual(await values(), original);
+      assert.deepEqual(await rowIDs(), submittedIDs);
+      await page.locator('[name=from]').fill('2026-12-01');
+      await collapseFilters();
+      assert.match(await page.locator('#filter-summary').innerText(), /From Dec 1, 2026/);
+      assert.match(await page.locator('#search-status').innerText(), /Filters changed/);
+      assert.equal(await page.locator('#search').isVisible(), false);
+      assert.deepEqual(await rowIDs(), submittedIDs);
+      await expandFilters();
+      assert.equal(await page.locator('[name=from]').inputValue(), '2026-12-01');
+      await load();
+    });
+
+    await check('keyboard submission moves focus out of the collapsed controls', async () => {
+      await search.focus();
+      await search.press('Escape');
+      await search.press('Enter');
+      await page.waitForFunction(() => document.querySelector('#filter-controls').hidden);
+      assert.equal(await page.locator('#filter-toggle').evaluate(el => el === document.activeElement), true);
+      await expandFilters();
     });
 
     await check('all filter edits and column reordering preserve the submitted results', async () => {
@@ -216,6 +305,8 @@ async function main() {
       await submit();
       await page.waitForFunction(() => document.querySelector('#list').dataset.as === 'OM');
       assert.ok(await page.locator('.l.hl i.light').count() > 0);
+      assert.ok(await page.locator('.l.hl').evaluateAll(cells => cells.every(el => getComputedStyle(el).backgroundColor === 'rgba(0, 0, 0, 0)')));
+      assert.ok(await page.locator('.head .l').evaluateAll(cells => new Set(cells.map(el => getComputedStyle(el).color)).size === 1));
       assert.ok(await page.locator('.l.hl i.light').evaluateAll(lights => lights.every(el => getComputedStyle(el).width === '10px' && getComputedStyle(el).opacity === '1')));
       assert.ok(await page.locator('.lights .l:not(.hl) i.light').evaluateAll(lights => lights.every(el => getComputedStyle(el).width === '8px' && getComputedStyle(el).opacity === '0.28')));
       await page.locator('[name=as]').selectOption('any');
@@ -250,6 +341,23 @@ async function main() {
         await page.waitForFunction(() => Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--head-h')) - (document.querySelector('.head')?.getBoundingClientRect().height || 0)) < .01);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${width}px`);
         assert.equal(await page.locator('.head').isVisible(), width > 820);
+        const expandedHeight = (await page.locator('.bar').boundingBox()).height;
+        await collapseFilters();
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `collapsed header overflow at ${width}px`);
+        assert.ok((await page.locator('.bar').boundingBox()).height < expandedHeight, `collapsed height at ${width}px`);
+        assert.equal(await page.locator('#search').isVisible(), false);
+        for (const button of ['#filter-toggle', '#theme']) assert.ok(await page.locator(button).evaluate(el => {
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.left >= 0 && r.right <= innerWidth;
+        }), `${button} clipped at ${width}px`);
+        const tools = await page.locator('.filter-tools').evaluate(el => {
+          const [toggle, theme] = el.children;
+          const a = toggle.getBoundingClientRect(), b = theme.getBoundingClientRect();
+          return { gap: b.left - a.right, top: Math.abs(a.top - b.top) };
+        });
+        assert.equal(tools.gap, 8);
+        assert.equal(tools.top, 0);
+        await expandFilters();
         await search.focus();
         assert.ok(await page.locator('#place-options').evaluate(el => {
           const r = el.getBoundingClientRect();
@@ -270,25 +378,29 @@ async function main() {
     await check('sticky headers overlap without a seam and titles stay aligned', async () => {
       for (const width of [821, 1024, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
-        const position = await page.evaluate(() => Math.min(300, document.documentElement.scrollHeight - innerHeight));
-        await page.evaluate(position => scrollTo(0, position), position);
-        await page.waitForFunction(position => scrollY === position
-          && Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) - document.querySelector('.bar').getBoundingClientRect().height) < .01, position);
-        const dimensions = await page.evaluate(() => {
-          const bar = document.querySelector('.bar').getBoundingClientRect();
-          const head = document.querySelector('.head').getBoundingClientRect();
-          const month = document.querySelector('h2').getBoundingClientRect();
-          const location = document.querySelector('.column-head[data-column=location]').getBoundingClientRect();
-          const flag = document.querySelector('.row[data-id] .flag').getBoundingClientRect();
-          return { barGap: head.top - bar.bottom, monthGap: month.top - head.bottom, locationX: location.left, flagX: flag.left };
-        });
-        assert.ok(dimensions.barGap <= 0 && dimensions.barGap >= -1.1, `filter seam at ${width}px: ${JSON.stringify(dimensions)}`);
-        assert.ok(dimensions.monthGap <= 0 && dimensions.monthGap >= -1.1, `month seam at ${width}px: ${JSON.stringify(dimensions)}`);
-        assert.equal(dimensions.locationX, dimensions.flagX);
+        for (const collapsed of [false, true]) {
+          if (collapsed) await collapseFilters(); else await expandFilters();
+          const position = await page.evaluate(() => Math.min(300, document.documentElement.scrollHeight - innerHeight));
+          await page.evaluate(position => scrollTo(0, position), position);
+          await page.waitForFunction(position => scrollY === position
+            && Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) - document.querySelector('.bar').getBoundingClientRect().height) < .01, position);
+          const dimensions = await page.evaluate(() => {
+            const bar = document.querySelector('.bar').getBoundingClientRect();
+            const head = document.querySelector('.head').getBoundingClientRect();
+            const month = document.querySelector('h2').getBoundingClientRect();
+            const location = document.querySelector('.column-head[data-column=location]').getBoundingClientRect();
+            const flag = document.querySelector('.row[data-id] .flag').getBoundingClientRect();
+            return { barGap: head.top - bar.bottom, monthGap: month.top - head.bottom, locationX: location.left, flagX: flag.left };
+          });
+          assert.ok(dimensions.barGap <= 0 && dimensions.barGap >= -1.1, `filter seam at ${width}px (${collapsed ? 'collapsed' : 'expanded'}): ${JSON.stringify(dimensions)}`);
+          assert.ok(dimensions.monthGap <= 0 && dimensions.monthGap >= -1.1, `month seam at ${width}px: ${JSON.stringify(dimensions)}`);
+          assert.equal(dimensions.locationX, dimensions.flagX);
+        }
       }
       assert.match(await page.locator('h2').first().textContent(), /^2026 November/);
       if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-scroll.png') });
       await page.evaluate(() => scrollTo(0, 0));
+      await expandFilters();
     });
 
     await check('theme choice persists and both themes render', async () => {
@@ -297,13 +409,16 @@ async function main() {
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
       await reload();
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+      await collapseFilters();
       if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-dark.png') });
       await page.locator('#theme').click();
       await page.locator('#theme').blur();
+      await page.mouse.move(0, 0);
       if (process.env.SITSERVE_SCREENSHOT_DIR) {
         await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-desktop.png') });
         await page.setViewportSize({ width: 390, height: 844 });
         await load();
+        await collapseFilters();
         await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-mobile.png') });
       }
       assert.deepEqual(errors, []);
@@ -361,6 +476,19 @@ async function main() {
         assert.equal(await p.locator('#search').getAttribute('data-state'), 'pending');
         assert.match(await p.locator('#search-status').innerText(), /Filters changed/);
         assert.equal(await p.locator('#list').getAttribute('data-as'), 'any');
+        assert.ok(await p.locator('#place-search').isVisible(), 'pending edits must stay expanded');
+        await p.locator('#search').click();
+        await p.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
+        assert.equal(await p.locator('#search').isVisible(), false);
+        await p.locator('#filter-toggle').click();
+        await p.waitForFunction(() => !document.querySelector('#filter-panel').hasAttribute('data-animating'));
+        await p.locator('#search').click();
+        await p.waitForFunction(() => document.querySelector('#search').disabled);
+        await p.locator('#filter-toggle').click();
+        assert.equal(await p.locator('#filter-toggle').getAttribute('aria-label'), 'Edit filters');
+        await p.locator('#filter-toggle').click();
+        await p.waitForFunction(() => !document.querySelector('#search').disabled);
+        assert.ok(await p.locator('#place-search').isVisible(), 'reopening during a refresh must stay expanded');
       });
     });
     await check('Cancel aborts the stream; superseding submission cannot display stale rows', async () => {
@@ -370,6 +498,7 @@ async function main() {
         await p.locator('#cancel').click();
         await p.waitForFunction(() => !document.querySelector('#search').disabled);
         assert.match(await p.locator('#search-limit').innerText(), /cancelled/i);
+        assert.ok(await p.locator('#place-search').isVisible());
         const count = await p.locator('.row[data-id]').count();
         await p.waitForTimeout(350);
         assert.equal(await p.locator('.row[data-id]').count(), count);
@@ -395,6 +524,7 @@ async function main() {
         await submitFault();
         assert.match(await p.locator('#search-limit').innerText(), /non-JSON/);
         assert.match(await p.locator('#search-status').innerText(), /Search to retry/);
+        assert.ok(await p.locator('#place-search').isVisible());
         await p.waitForTimeout(150);
         assert.equal((await (await fetch(local.url + '/api/debug')).json()).simulatorRequests, 1);
         await submitFault();

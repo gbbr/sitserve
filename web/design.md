@@ -35,17 +35,37 @@ and a simulator, identified by a small “simulated data” badge.
   `14D/TSC` is one filter matching both upstream course types. Existing links with `types=14D`
   or `types=TSC` restore that combined chip. Rows retain their own 14D or TSC code and full name.
 - **As**: anyone, or new / old / server × male / female. This narrows "can sign up" to that
-  position, highlights its light column, and enlarges its lights from 8px to 10px. Other
+  position and enlarges its lights from 8px to 10px. Column backgrounds and header labels
+  stay neutral. Other
   positions' lights are dimmed to 28% opacity. Anyone restores all lights to their normal size
   and opacity. The legend remains unchanged.
-- **Language** (one instruction language) and **centers only**. The select shows names and stores
+- **Lang** (one instruction language) and **centers only**. The select shows names and stores
   upstream ISO codes; old links such as `lang=English` restore as `lang=en`.
-- **Also show**: wait lists (on by default) and not open yet (on by default).
+- **Show**: wait lists (on by default) and not open yet (on by default).
 - **Theme switch**, top right: light/dark. The page follows the system until the switch is
-  clicked, then remembers the choice in localStorage.
+  clicked, then remembers the choice in localStorage. Light uses a warm ivory background
+  (`#f7f1e5`) and sepia text; dark uses deep brown (`#211c18`) and beige text. Controls,
+  popovers, borders and hover surfaces follow the same warm palette. The primary accent is
+  brown in light mode and golden beige in dark mode; availability retains its familiar colors.
+- **Auto-collapse**: after a successful search finishes, collapse the filters to a compact
+  bar with the selected places, start date, course types and other filter choices. Results
+  appear first, followed by a 300ms pause and a 280ms slide. Contents fade over 240ms, remain
+  mounted until the slide finishes, and fade in again when opened. Reduced-motion preferences
+  skip the animation. **Edit filters** reopens the existing controls without changing results
+  or selections; **Hide filters** closes them again. One filter icon button stays visible
+  at the top right beside the theme switch, with the current action as its tooltip and
+  accessible label. Search appears only with the open controls, aligned right with its status
+  text immediately to its left. Pending edits made
+  during a search, errors and cancellation leave the controls open. Reopening controls during
+  a search also keeps them open when it finishes. Page load and shared links start expanded.
+  The compact summary groups neutral place pills with a location icon, a bordered date chip,
+  course badges using their existing category colors, and quieter applicant/language/option
+  chips. A long summary scrolls horizontally. On phones the summary uses a second row.
+- **Expanded layout**: Where, From, As and Lang share the first row on desktop. Course
+  types lead the second row, followed by centers only and the Show checkboxes.
 - **Search**: submits all filters together. No automatic search on filter changes, place
   selection, page load or URL restoration. The compact button says **Search** in its resting
-  states: solid blue with a search icon before the first submission; quiet outlined with a
+  states: solid brown with a search icon before the first submission; quiet outlined with a
   checkmark when the visible results match the filters; solid amber with a refresh icon when
   filters change. The amber background is distinct in both themes. Pending edits leave the
   submitted results in place and show "Filters changed. Press Search to update results." in
@@ -54,6 +74,7 @@ and a simulator, identified by a small “simulated data” badge.
   “Searching…”, is disabled, and shows progress through the last searched date. Cancel stops the
   stream. Edits during loading preserve the submitted results and show the pending warning.
   Column reordering and theme changes preserve the submitted filters too.
+  The initial helper, "Up to 50 matching courses per search.", uses the faint text color.
 - Submitted filters live in the URL fragment, so a search can be bookmarked or shared.
   Opening a link restores the form; press Search to retrieve results.
 
@@ -64,6 +85,9 @@ and a simulator, identified by a small “simulated data” badge.
   lists are on. Courses whose registration hasn't opened yet also show, because registration
   opens only 2–3 months ahead. In-progress, full and closed courses never show, and there's
   no "N hidden" count.
+- **Before the first search:** below the filters, show only "Choose your filters and press
+  Search to find up to 50 matching courses." Hide the summary, legend and footer until a
+  search starts. The footer is centered when shown.
 - **Summary line:** "N courses you can sign up for", plus a legend: the blue non-center dot and
   the open / wait list / long wait list / closed lights.
 - **Result limit:** collect up to 50 courses that pass every filter, fetching more upstream
@@ -76,19 +100,23 @@ and a simulator, identified by a small “simulated data” badge.
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
   bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
   Keep full month names and align these group headings to the left edge of the table, rather
-  than the Dates column. Rows sort by start date, then name.
+  than the Dates column. Rows sort by start date, then name. The table header uses a warm
+  tinted band and bottom border spanning the full page width, square corners, compact uppercase
+  labels and subtle column dividers. Result rows retain their constrained width.
+  New / Old / SRV each has a fine grouping rule above its M / F labels. Month counts use a
+  small muted pill. Sticky offsets follow the filter bar as it opens or collapses.
 - **Rows:** compact, one 32px line each on wide screens.
 - **Columns** (default order), rearrangeable by dragging their headings. A marker shows which
   side of a heading the column will land on. Focused headings also support Alt + Left/Right.
   The order is stored in localStorage as `sit.columns`; invalid saved orders fall back to the
   default. Both headings and rows use one column-to-HTML map and the same grid track order:
   1. **Location**:
-     - Shows a square flag, then the name without its "Dhamma " prefix. Only non-centers have
+     - Shows a rectangular flag, then the name without its "Dhamma " prefix. Only non-centers have
        a tiny faint blue dot; centers have no dot. The legend explains the non-center marker.
      - Align the Location heading with the flag, at the left edge of the whole cell.
-     - Flags are 16×16px local SVGs from `flag-icons` v7.3.2, with 2px corners and a fine edge.
+     - Flags are 16×12px local SVGs from the 4:3 set of `flag-icons` v7.3.2, with 2px corners and a fine edge.
        They use 78% opacity and 75% saturation to blend with the quiet rows; hovering restores
-       their full color. The 29 countries in the snapshot are saved under `assets/flags/`, with
+       their full color. The 30 supported countries, including Japan, are saved under `assets/flags/`, with
        the upstream MIT license and a source/hash manifest. Countries without a local asset use
        a text fallback. Keep the flag inside the Location
        cell so it moves with the name when columns are reordered.
@@ -100,7 +128,7 @@ and a simulator, identified by a small “simulated data” badge.
      end is at 40% opacity so the start stands out. Hovering shows the full dates with weekdays.
   3. **Type**:
      - Shows a centered, compact badge containing the chip code. The Type heading is centered too.
-     - Basic courses (3D, 10D, 10D OS, EXEC) use slate text on a neutral background with a fine
+     - Basic courses (3D, 10D, 10D OS, EXEC) use warm brown text on a neutral background with a fine
        border. A crisp outline and readable text keep these from looking disabled.
      - Long courses (10D SPCL and 20/30/45/60D) use a subtle violet tint.
      - STP, 14D and TSC use a subtle teal tint, distinct from both basic and long courses.
@@ -110,8 +138,8 @@ and a simulator, identified by a small “simulated data” badge.
      - Hovering the code shows the full name, with the languages on a second line.
   4. **Lights**: six 13px columns with a two-row heading: NEW / OLD / SRV, each over M F.
      Columns in a pair are 2px apart, groups 12px apart.
-  5. **Apply**: a centered link styled as a quiet blue button, 24px high and 64px wide,
-     with a fine border, 6px corners, and a very faint blue fill. Hover strengthens the border
+  5. **Apply**: a centered link styled as a quiet accent-colored button, 24px high and 64px wide,
+     with a fine border, 6px corners, and a very faint accent fill. Hover strengthens the border
      and fill; keyboard focus has a visible outline. It still opens the application form in
      another tab. Before registration opens it shows the opening date inside a disabled
      button with the same fixed dimensions, a muted border and fill, and the day before the month
@@ -152,9 +180,9 @@ Course badge colors (foreground / background):
 
 | Group | Light | Dark |
 |---|---|---|
-| Basic | `#586171` / `#fff`, control border | `#b4bdca` / `#1b1f26`, control border |
-| Long | `#7351a8` / `#f1ecf8` | `#c4a7ee` / `#2b2338` |
-| STP / 14D / TSC | `#287b7a` / `#e8f4f2` | `#85cec8` / `#1c3334` |
+| Basic | `#74614e` / `#fcf7ed`, control border | `#cbb79c` / `#2b231d`, control border |
+| Long | `#805d8b` / `#eee3ed` | `#ceb0d2` / `#392c38` |
+| STP / 14D / TSC | `#426e60` / `#e5ece0` | `#a8c6ad` / `#26332a` |
 
 How a status's `type` fills the columns:
 - `m` fills NM and OM; `w` fills NF and OF; `s` fills SM and SF.

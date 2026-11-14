@@ -16,10 +16,13 @@ const ICONS = {
   search: svg('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   check: svg('<path d="m5 12 4 4L19 6"/>'),
   refresh: svg('<path d="M20 7v5h-5M19.5 12a7.5 7.5 0 1 0-2 5.5M20 12l-3-4"/>'),
+  filters: svg('<path d="M4 7h7m4 0h5M4 17h3m4 0h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
   warning: svg('<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5M12 17h.01"/>'),
   web: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>'),
   schedule: svg('<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
   notes: svg('<path d="M6 3.5h8.5L19 8v12.5H6z"/><path d="M14 3.5V8h5M9 12.5h7M9 16h5"/>'),
+  place: svg('<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/>'),
+  person: svg('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/>'),
   moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>'),
 };
@@ -31,7 +34,7 @@ const byId = new Map();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const inertHTML = html => { const el = document.createElement('template'); el.innerHTML = html; return el.content; };
 const textOf = html => inertHTML(html).textContent.replace(/\s+/g, ' ').trim();
-const FLAG_CODES = new Set(["ae","ar","au","be","br","ca","co","de","es","fr","gb","gr","id","il","in","it","kr","lk","mm","nl","np","pe","pl","ru","se","th","tw","us","vn"]);
+const FLAG_CODES = new Set(["ae","ar","au","be","br","ca","co","de","es","fr","gb","gr","id","il","in","it","jp","kr","lk","mm","nl","np","pe","pl","ru","se","th","tw","us","vn"]);
 const flag = cc => FLAG_CODES.has((cc || '').toLowerCase()) ? `<img src="assets/flags/${cc.toLowerCase()}.svg" alt="">` : esc(/^[a-z]{2}$/i.test(cc || '') ? cc.toUpperCase() : '?');
 
 // The Where control stores stable place keys; typing only searches suggestions.
@@ -348,9 +351,96 @@ function headHTML(f) {
 const openNotes = new Set();
 const RESULT_LIMIT = 50;
 let searchResult = null, controller = null;
+let filterAnimation = null, filterFade = null, autoCollapseTimer = null;
+
+function cancelAutoCollapse() {
+  clearTimeout(autoCollapseTimer);
+  autoCollapseTimer = null;
+}
+
+function setFiltersCollapsed(collapsed) {
+  cancelAutoCollapse();
+  if (collapsed === (form.dataset.collapsed === 'true')) return;
+  const panel = $('#filter-panel'), controls = $('#filter-controls'), toggle = $('#filter-toggle'), compactSummary = $('#filter-summary');
+  const moveFocus = collapsed && controls.contains(document.activeElement);
+  const startHeight = panel.getBoundingClientRect().height;
+  const startOpacity = controls.hidden ? 0 : getComputedStyle(controls).opacity;
+  filterAnimation?.cancel();
+  filterFade?.cancel();
+  controls.hidden = false;
+  controls.inert = collapsed;
+  controls.setAttribute('aria-hidden', String(collapsed));
+  compactSummary.hidden = false;
+  compactSummary.style.visibility = 'visible';
+  compactSummary.setAttribute('aria-hidden', String(!collapsed));
+  compactSummary.tabIndex = collapsed ? 0 : -1;
+  form.dataset.collapsed = String(collapsed);
+  toggle.setAttribute('aria-expanded', String(!collapsed));
+  const label = collapsed ? 'Edit filters' : 'Hide filters';
+  toggle.setAttribute('aria-label', label);
+  toggle.dataset.tip = label;
+  closePlaces();
+  hideTip();
+  if (moveFocus) toggle.focus({ preventScroll: true });
+  const endHeight = collapsed ? 0 : controls.getBoundingClientRect().height;
+  const finish = () => {
+    controls.hidden = collapsed;
+    compactSummary.style.visibility = collapsed ? 'visible' : 'hidden';
+    delete panel.dataset.animating;
+    filterFade?.cancel();
+    filterFade = null;
+    filterAnimation = null;
+    measureHeaders();
+  };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || Math.abs(startHeight - endHeight) < 1) {
+    finish();
+    return;
+  }
+  panel.dataset.animating = 'true';
+  const animation = panel.animate([
+    { height: `${startHeight}px` },
+    { height: `${endHeight}px` },
+  ], { duration: 280, easing: 'cubic-bezier(.4, 0, .2, 1)' });
+  filterFade = controls.animate([
+    { opacity: startOpacity },
+    { opacity: collapsed ? 0 : 1 },
+  ], { duration: 240, easing: 'ease-in-out', fill: 'forwards' });
+  filterAnimation = animation;
+  animation.finished.then(() => { if (filterAnimation === animation) finish(); }, () => {});
+}
+
+function filterSummary(f) {
+  const selectedPlaces = f.where.split(',').map(key => placeByKey.get(key)).filter(Boolean);
+  const token = (kind, text, icon = '', tip = text) => `<span class="filter-token ${kind}" data-tip="${esc(tip)}">${icon}${esc(text)}</span>`;
+  const group = (name, label, content) => `<span class="filter-group" data-filter="${name}" role="group" aria-label="${label}">${content}</span>`;
+  const selectedTypes = new Set(f.types.split(','));
+  const courseTokens = FILTER_TYPES.filter(([, code]) => selectedTypes.has(code))
+    .map(([raw, code]) => token(`course ${typeClass(raw)}`, code, '', filterTypeTip(raw))).join('');
+  const options = [
+    token('option', f.as === 'any' ? 'Anyone' : COLUMN_NAME[f.as], ICONS.person),
+    f.lang && token('option', form.elements.lang.selectedOptions[0].textContent, ICONS.web),
+    f.centers && token('option', 'Centers only'),
+    !f.wait && token('option', 'No wait lists'),
+    !f.soon && token('option', 'Registration open now'),
+  ].filter(Boolean).join('');
+  return [
+    group('where', 'Places', selectedPlaces.map(p => token('place', p.kind === 'region' ? p.text : p.texts[0], ICONS.place, p.text)).join('') || token('place', 'Everywhere', ICONS.place)),
+    group('from', 'Start date', token('date', `From ${shortDate(f.from)}, ${f.from.slice(0, 4)}`, ICONS.schedule)),
+    group('types', 'Course types', courseTokens || token('course regular', 'All courses')),
+    group('options', 'Other filters', options),
+  ].join('');
+}
+
+$('#filter-toggle').innerHTML = ICONS.filters;
+$('#filter-toggle').addEventListener('click', () => {
+  const collapsed = form.dataset.collapsed === 'true';
+  if (collapsed && searchResult) searchResult.keepFiltersOpen = true;
+  setFiltersCollapsed(!collapsed);
+});
 
 function updateSearchStatus() {
-  const pending = searchResult && toFragment(readFilters()) !== toFragment(searchResult.filters);
+  const filters = readFilters();
+  const pending = searchResult && toFragment(filters) !== toFragment(searchResult.filters);
   const state = searchResult?.loading ? 'loading' : !searchResult ? 'initial' : pending ? 'pending' : 'complete';
   const icon = { initial: ICONS.search, complete: ICONS.check, pending: ICONS.refresh, loading: ICONS.refresh }[state];
   const button = $('#search');
@@ -358,8 +448,12 @@ function updateSearchStatus() {
   button.disabled = state === 'loading';
   button.innerHTML = `${icon}<span>${state === 'loading' ? 'Searching…' : 'Search'}</span>`;
   $('#cancel').hidden = state !== 'loading';
+  const compactSummary = $('#filter-summary');
+  const compactHTML = filterSummary(filters);
+  if (compactSummary.innerHTML !== compactHTML) compactSummary.innerHTML = compactHTML;
+  compactSummary.hidden = !searchResult && form.dataset.collapsed !== 'true';
   const status = $('#search-status');
-  status.dataset.state = pending ? 'pending' : state;
+  status.dataset.state = pending ? 'pending' : searchResult?.error ? 'error' : searchResult?.reason === 'cancelled' ? 'cancelled' : state;
   const progress = searchResult?.searchedThrough ? ` through ${shortDate(searchResult.searchedThrough)}` : '';
   status.innerHTML = pending
     ? `${ICONS.warning}<span>Filters changed. Press Search to update results.${state === 'loading' ? ` Searching…${progress}` : ''}</span>`
@@ -375,6 +469,8 @@ function checkedText(iso) {
   return minutes < 1 ? 'Checked just now' : minutes < 60 ? `Checked ${minutes} min ago` : `Checked ${Math.floor(minutes / 60)} h ago`;
 }
 async function searchCourses() {
+  cancelAutoCollapse();
+  setFiltersCollapsed(false);
   controller?.abort();
   const active = new AbortController(); controller = active;
   active.id = crypto.randomUUID();
@@ -419,7 +515,16 @@ async function searchCourses() {
     else { result.error = e.message; result.partial = result.shown.length > 0; }
   } finally {
     reader?.releaseLock(); result.loading = false;
-    if (searchResult === result) { render(); updateSearchStatus(); }
+    if (searchResult === result) {
+      render(); updateSearchStatus();
+      const pending = toFragment(readFilters()) !== toFragment(result.filters);
+      if (!result.error && result.reason !== 'cancelled' && !pending && !result.keepFiltersOpen) {
+        // Let the completed results paint before sliding the controls away.
+        autoCollapseTimer = setTimeout(() => {
+          if (searchResult === result && !result.keepFiltersOpen && toFragment(readFilters()) === toFragment(result.filters)) setFiltersCollapsed(true);
+        }, 300);
+      } else setFiltersCollapsed(false);
+    }
     if (controller === active) controller = null;
   }
 }
@@ -431,8 +536,10 @@ function render() {
   hideTip();
   list.style.setProperty('--columns', columnOrder.map(k => DISPLAY_COLUMNS[k].width).join(' '));
   const limit = $('#search-limit');
+  $('.summary').hidden = !searchResult;
+  $('footer').hidden = !searchResult;
   if (!searchResult) {
-    summary.textContent = 'Ready to search';
+    summary.textContent = '';
     list.innerHTML = '<p class="empty">Choose your filters and press Search to find up to 50 matching courses.</p>';
     limit.hidden = true;
     return;
@@ -572,7 +679,7 @@ form.addEventListener('submit', e => {
   e.preventDefault();
   void searchCourses();
 });
-addEventListener('hashchange', () => { setFilters(fromFragment()); updateSearchStatus(); });
+addEventListener('hashchange', () => { setFilters(fromFragment()); setFiltersCollapsed(false); updateSearchStatus(); });
 
 // Keep the column header row just below the filter bar while scrolling.
 const measureHeaders = () => {
@@ -594,6 +701,7 @@ function showThemeButton() {
   themeButton.setAttribute('aria-label', label);
 }
 themeButton.addEventListener('click', () => {
+  hideTip();
   const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('theme', theme); } catch { /* the choice lasts until reload */ }
