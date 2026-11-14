@@ -1,0 +1,260 @@
+{
+  "snapshot": "2026-11-14",
+  "notes": "daterange is null where not recorded. Corpus deduplicates all saved do_search pages by id; later captures win. Only course_type_hint, instruction_languages_tooltip and location.contact/about/instructions are dropped. Oracle input uses original 2026-11-13 source order. Oracle differences: sanitized comments, safe canonical URLs (including trailing slashes), same-origin photos, hasNotes. Search location 1699 has no directory pin and is treated as non-center. Metadata hashes verify equality with the original snapshot.",
+  "probeFacts": "probe-facts.json records paging, accepted filters, ids and hashes for every 2026-11-14 probe. Page size probes return the same IDs and paging as base.",
+  "verbatimBytes": 733533,
+  "corpusCourses": 283,
+  "files": [
+    {
+      "file": "verbatim/2026-11-14-probe-base.json",
+      "source": "2026-11-14-probe/base.json",
+      "captured": "2026-11-14",
+      "sha256": "43e17f94ffb668383c4df5a3adef5ee9bc1af1466808e50e1f61dadc29d55105",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": "2026-11-14 - 2028-11-14",
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Worldwide 10-day; truncated; in progress; Indian app_page_url; HTML notes"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-p11.json",
+      "source": "2026-11-14-probe/p11.json",
+      "captured": "2026-11-14",
+      "sha256": "1c97796343ba95d7f7cc57587026a841d2d34859db16757020c09254a2176ba2",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 11,
+        "daterange": "2026-11-14 - 2028-11-14",
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Page 11 returns page 10"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-later.json",
+      "source": "2026-11-14-probe/later.json",
+      "captured": "2026-11-14",
+      "sha256": "4c24f510601f468e61d42cd1e42edd0cd5056920192a2ddbf8ad748cea740374",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Later start-date cursor"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-lang.json",
+      "source": "2026-11-14-probe/lang.json",
+      "captured": "2026-11-14",
+      "sha256": "60be4cc69a93fca513f349abdfda9bda9543d0d71edf02cd4ace39ed0556d475",
+      "request": {
+        "current_state": "OldStudents",
+        "languages": [
+          "en"
+        ],
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": "2026-11-14 - 2028-11-14",
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "English language filter"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-am.json",
+      "source": "2026-11-14-probe/am.json",
+      "captured": "2026-11-14",
+      "sha256": "4f1a736a134f09d688fb406687f5c0dbef16ceebb1d142efd8f3723770d7a31e",
+      "request": {
+        "current_state": "OldStudents",
+        "regions": [
+          "region_402"
+        ],
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": "2026-11-14 - 2028-11-14",
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Americas region; non-center venues"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-f_win.json",
+      "source": "2026-11-14-probe/f_win.json",
+      "captured": "2026-11-14",
+      "sha256": "df54f3b819b5e76a57bdb2f1d72314ca9c79a46b104859c5d2ec91359ac3d8e6",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "64 rows; seven pages; not truncated"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-d_base1.json",
+      "source": "2026-11-14-probe/d_base1.json",
+      "captured": "2026-11-14",
+      "sha256": "cd768ed12c19e196879365aed30a9bd7469588de539c9579e07c0e8d31c09848",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Empty date window"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-a_base.json",
+      "source": "2026-11-14-probe/a_base.json",
+      "captured": "2026-11-14",
+      "sha256": "f7f7d46557206dfc022c682858002c5afb8edbb14d5b5aec9f34cb7298bdb4a9",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3,
+          28,
+          6,
+          66,
+          4,
+          11,
+          12,
+          23,
+          21,
+          1,
+          10,
+          9
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "All in-scope types; cancelled and status coverage"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-t_new.json",
+      "source": "2026-11-14-probe/t_new.json",
+      "captured": "2026-11-14",
+      "sha256": "387e880c9fc58d13d51ed2ece950357c5c40a92ff53a87d6de10c9f754b72b6a",
+      "request": {
+        "current_state": "NewStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "NewStudents type-3 query"
+    },
+    {
+      "file": "verbatim/2026-11-14-probe-t_old.json",
+      "source": "2026-11-14-probe/t_old.json",
+      "captured": "2026-11-14",
+      "sha256": "cede4a1406566a93e082e10f244931b07798945651fa93fc3682a9c5f4550ab5",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          3
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "OldStudents type-3 query"
+    },
+    {
+      "file": "verbatim/2026-11-13-data-types-66.json",
+      "source": "2026-11-13-data/types/66.json",
+      "captured": "2026-11-13",
+      "sha256": "aa16374fde9366deb14672f534a81c67059d97a5736550b5219499869c5ed4e6",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          66
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Gratitude courses; registration opening statuses"
+    },
+    {
+      "file": "verbatim/2026-11-13-data-types-21.json",
+      "source": "2026-11-13-data/types/21.json",
+      "captured": "2026-11-13",
+      "sha256": "c0dd59d090fb8ae7fcd1bb77a656304a0d208f47f79c26cbd55c075f5fb59eb3",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          21
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Teacher self courses"
+    },
+    {
+      "file": "verbatim/2026-11-13-data-types-28.json",
+      "source": "2026-11-13-data/types/28.json",
+      "captured": "2026-11-13",
+      "sha256": "aa7846bc4d1714db396c8d133c11d96f483d0b6c05dac75e2cb60370e518e169",
+      "request": {
+        "current_state": "OldStudents",
+        "course_type_constraint": [
+          28
+        ],
+        "page": 1,
+        "daterange": null,
+        "sort_column": "dates",
+        "sort_direction": "up",
+        "date_format": "YYYY-MM-DD"
+      },
+      "demonstrates": "Old-student 10-day courses"
+    }
+  ]
+}

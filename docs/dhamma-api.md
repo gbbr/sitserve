@@ -1,6 +1,6 @@
 # dhamma.org data sources
 
-Data sources on www.dhamma.org for the website's sample data and future JavaScript backend.
+Data sources on www.dhamma.org for the sitserve's local simulator and live JavaScript backend.
 None of this is a documented public API: these are the endpoints and inline data the site's own
 pages use, so they can change without notice. Verified 2026-11-13; pagination, date ranges and
 filters rechecked on 2026-11-14, when `/robots.txt` contained no rules.
@@ -28,10 +28,10 @@ Form-encoded request, JSON response. The site uses the current page's locale pre
 ```sh
 curl -s -X POST https://www.dhamma.org/en-US/courses/do_search \
   -H 'Accept: application/json' -H 'X-Requested-With: XMLHttpRequest' \
-  --data-urlencode 'current_state=NewStudents' \
+  --data-urlencode 'current_state=OldStudents' \
   --data-urlencode 'daterange=2026-11-13 - 2027-11-13' \
   --data-urlencode 'course_type_constraint[]=3' \
-  --data-urlencode 'course_type_constraint[]=31' \
+  --data-urlencode 'course_type_constraint[]=1' \
   --data-urlencode 'regions[]=region_402' \
   --data-urlencode 'page=1' \
   --data-urlencode 'sort_column=dates' \
@@ -50,7 +50,7 @@ curl -s -X POST https://www.dhamma.org/en-US/courses/do_search \
 | `page` | 1-based. A page past the last one returns the last page: `page=11` returned page 10. |
 | `sort_column`, `sort_direction`, `date_format` | The site sends `dates`, `up` and `YYYY-MM-DD`; other values untested. |
 | `languages[]` | ISO codes from the search page's language list, e.g. `en`. Narrows results: a two-year worldwide 10-day search went from 4,069 to 3,928 courses, and its first page held only courses with English among their instruction languages. |
-| `attendee_types[]` | `Attend` or `Serve`. Narrows results (`sit`'s in-scope types worldwide for one year: 4,681 → 4,421 and 4,359) but ignores availability: full, closed and in-progress courses still appear. Which courses it removes is unverified. |
+| `attendee_types[]` | `Attend` or `Serve`. Narrows results (sitserve's in-scope types worldwide for one year: 4,681 → 4,421 and 4,359) but ignores availability: full, closed and in-progress courses still appear. Which courses it removes is unverified. |
 | `genders[]` | `Male` or `Female`, the option text the site sends. Accepted, but totals and courses were unchanged. |
 | `course_types[]` | Sent by the site's course type widget; value format untested. |
 
@@ -59,17 +59,17 @@ curl -s -X POST https://www.dhamma.org/en-US/courses/do_search \
 - 10 courses per page and at most 10 pages, so one query returns at most 100 courses.
   `total_rows` still gives the full count, and `pages_truncated` is `true` when it's over 100.
   Broad queries reach this quickly: the first 100 worldwide 10-day courses from 2026-11-14 all
-  started by Nov 21. `sit` continues with a new query from the last returned start date, within
+  started by Nov 21. sitserve continues with a new query from the last returned start date, within
   a per-search page cap (see [plan.md](plan.md#live-search)).
 - Typical sizes for one year from 2026-11-13: new-student courses worldwide 3,487; in the
-  Americas 441; long courses (IDs 66, 4, 11, 12, 23, 6, 21) worldwide 278. All of `sit`'s
+  Americas 441; long courses (IDs 66, 4, 11, 12, 23, 6, 21) worldwide 278. All of sitserve's
   in-scope types worldwide for one year from 2026-11-14: 4,681.
 - The page size is fixed at 10: `page_size` and `per_page` are ignored. The site's script sets
   `page_size: 10` but doesn't send it.
 
 ### Live pagination check (2026-11-14)
 
-A worldwide `OldStudents` query with all of `sit`'s in-scope types and date range
+A worldwide `OldStudents` query with all of sitserve's in-scope types and date range
 `2026-11-14 - 2027-11-14` reached 30 usable matches on page 4. Those four pages contained 40
 courses: 33 with an open or wait-list position, four in progress and one cancelled, plus two
 closed courses. The in-progress courses all started on 2026-11-14; no course in these pages
@@ -109,8 +109,7 @@ Useful course fields:
 
 ### Course type IDs
 
-Listed in `viewModel.course_types(...)` on `/en/courses/search`. A future JavaScript metadata
-script can extract these for the website. By search mode:
+Listed in `viewModel.course_types(...)` on `/en/courses/search`. `web/tools/build-places.js` extracts these from saved HTML. By search mode:
 
 - **NewStudents:** 3 10-Day, 31 9-Day
 - **OldStudents**, under the site's headings:
@@ -136,7 +135,7 @@ Search results give a course's type as a `raw_course_type` code, not the ID: 3 `
 ### Place IDs
 
 `regions[]` takes `<kind>_<id>`. Every valid value is listed in `viewModel.search_regions([...])`
-on `/en/courses/search`; `web/mockup-data.js` contains a snapshot as `PLACES`:
+on `/en/courses/search`; `web/places.js` contains the generated `PLACES` metadata:
 
 | Kind | Count | Example | Notes |
 |---|---|---|---|
@@ -176,8 +175,8 @@ HTML list of every location, nested World › continent › country › state. L
 `<div class="location" data-id="1320" data-subdomain="sukhada" data-name="…" data-country-iso-code="AR">`
 containing a `center-pin` or `noncenter-pin`. Regions are
 `<div class="region" data-id="402" data-name="Americas" data-subdomain="019">`, followed by a
-sibling `<div class="region-children">`. `sit` doesn't use it; the search and maps pages cover
-the same data.
+sibling `<div class="region-children">`. sitserve uses the directory for nesting and
+center/non-center pins, and the search page for selectable places.
 
 ## Schedule pages
 
@@ -185,14 +184,36 @@ the same data.
 All share one template: tables under `sch-header-year` headings, with rows
 `<tr class="sch-row-N <raw_course_type>">` and columns for apply, dates, type, status, location
 and comments. Date formats vary (`10 Nov - 21 Nov` with the year in the heading, or
-`December 22, 2026`). `sit` doesn't use them; the search endpoint has the same information as
+`December 22, 2026`). sitserve does not use schedule HTML; the search endpoint has the same information as
 structured data.
 
-## Implications for `sit`
+## Implications for sitserve
 
 - There's no "long-course center" flag, and Dhamma Tapovana's schedule also lists 10-day
   executive, Satipatthana and 1-day courses. Filter by course type instead.
 - There's no distance filter. Pick nearby locations using the cached coordinates and pass them as
   several `regions[]=location_<id>`.
 - The site's applicant filters are attend/serve and gender, and neither considers availability.
-  `sit`'s As filter (new / old / server × male / female) checks that position's status itself.
+  sitserve's As filter (new / old / server × male / female) checks that position's status itself.
+
+## Local implementation
+
+`worker/dhamma.js` builds this form request with `Accept: application/json` and
+`X-Requested-With: XMLHttpRequest`. Live identity is
+`sitserve/<version> (+<SITE_URL>; <UPSTREAM_CONTACT>)`; missing contact prevents all live requests.
+Redirects are not followed. The client validates page/course fields and classifies throttling,
+5xx, challenges/non-JSON, malformed JSON/envelopes, timeout and slow responses, without retries.
+Invalid individual courses are skipped and logged. Valid slow responses are cached and returned
+while further uncached requests pause.
+
+The ordinary development mode is a simulator that parses those real form Requests using saved
+raw course objects. No development command or test needs dhamma.org. The curated byte-identical
+responses, capture dates, known request parameters and hashes are in
+`worker/fixtures/dhamma/manifest.json`; unknown date ranges are recorded as null. Probe metadata
+is in `probe-facts.json`. Corpus fields omitted for size are listed in the manifest.
+
+The DO shares normalized pages for **24 hours**, persisted across restarts; photo storage lasts
+seven days. API responses are streamed NDJSON and have `Cache-Control: no-store`. Run
+`npm run dev`, `npm test`, `npm run test:worker` or `npm run test:browser` for offline work.
+`npm run dev:live` and the Wrangler `production` environment are explicit live modes. See
+[plan.md](plan.md) for pacing, allowances, breaker behavior and the stream contract.

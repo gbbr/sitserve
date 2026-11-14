@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sitserve",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["enable_request_signal", "request_signal_passthrough"],
+  "workers_dev": false,
+  "assets": {
+    "directory": "web",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/photo/*"]
+  },
+  "durable_objects": { "bindings": [{ "name": "UPSTREAM_GATE", "class_name": "UpstreamDurableObject" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UpstreamDurableObject"] }],
+  "vars": {
+    "UPSTREAM": "simulator",
+    "SIMULATOR_DATE_SHIFT": "1",
+    "UPSTREAM_SPACING_MS": "250",
+    "SITE_URL": "http://localhost:8787"
+  },
+  "env": {
+    "production": {
+      "vars": { "UPSTREAM": "live", "SITE_URL": "https://sitserve.example", "UPSTREAM_SPACING_MS": "1500" },
+      "durable_objects": { "bindings": [{ "name": "UPSTREAM_GATE", "class_name": "UpstreamDurableObject" }] }
+    }
+  }
+}

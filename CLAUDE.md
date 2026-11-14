@@ -1,14 +1,23 @@
-# sit
+# sitserve
 
 A website for finding Vipassana courses listed on dhamma.org that you can still sign up for.
-Work in `web/`: `mockup.html` is plain HTML, CSS and JavaScript, using `mockup-data.js` as a
-fixed sample. There is no framework or build step. The future live-data backend will be a
-JavaScript Cloudflare Worker.
+`web/index.html` and `web/app.js` are plain HTML/CSS/JavaScript, with no page build step.
+`worker/` is the Cloudflare Worker and SQLite-backed Durable Object backend.
 
-- Current design decisions and handoff: @web/design.md
-- Website implementation plan: @docs/plan.md
-- dhamma.org endpoints, parameters and limits: @docs/dhamma-api.md
+- UI decisions: [web/design.md](web/design.md)
+- Architecture, limits and development: [docs/plan.md](docs/plan.md)
+- Verified upstream behavior: [docs/dhamma-api.md](docs/dhamma-api.md)
 
-Check interactions and responsive layouts in a browser after UI changes. Talk to dhamma.org with
-plain HTTP requests only: never replay browser cookies or imitate a browser. Rebuild any needed
-metadata using JavaScript scripts; the Go CLI and its index implementation have been removed.
+Use **sitserve** for the app, package and Worker. Preserve localStorage key `sit.columns`.
+Docs and comments describe the current purpose and behavior, with concise wording.
+
+`npm run dev` uses saved data and a local simulator; it never contacts dhamma.org, including
+photos. `npm test`, `npm run test:worker` and `npm run test:browser` are offline. Keep fetch,
+clock, timers and storage injectable. Check interactions and responsive layouts after UI changes.
+Playwright lives outside the checkout at `/tmp/sit-web-test/node_modules`.
+
+Only explicit live mode (`npm run dev:live` or the Wrangler `production` environment) can contact
+dhamma.org. It requires `UPSTREAM_CONTACT` in `.dev.vars` or a secret. All upstream requests pass
+through one Durable Object, with plain HTTP: no browser cookies, browser User-Agent, Origin or
+Referer. Never run live mode as part of development verification. New metadata tools read saved
+files with JavaScript; they do not fetch upstream pages.

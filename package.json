@@ -1,0 +1,16 @@
+{
+  "name": "sitserve",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "4.162.0"
+  },
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:live": "node scripts/dev.js --live",
+    "test": "node --import ./worker/test/setup.js --test worker/test/*.test.js worker/test/integration.cjs",
+    "test:worker": "node --import ./worker/test/setup.js --test worker/test/integration.cjs",
+    "test:browser": "NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/test-browser.cjs"
+  }
+}

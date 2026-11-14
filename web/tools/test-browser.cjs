@@ -1,27 +1,32 @@
-// Browser regression checks; no dependencies or build step are needed to use the page.
-// Test setup: npm install --prefix /tmp/sit-web-test playwright
-// Run: NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/test-mockup.cjs
-// Uses local Chrome on macOS, or Playwright's Chromium. CHROME_PATH can override it.
+// Served-page regression checks. npm run test:browser boots an offline local Worker.
 const assert = require('node:assert/strict');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const { startServer } = require('../../worker/test/server.cjs');
 const { chromium } = require('playwright');
 
 async function main() {
   const macChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  const browser = await chromium.launch({
+  const server = await startServer();
+  let browser;
+  try { browser = await chromium.launch({
+    args: ['--disable-background-networking'],
     headless: true,
     executablePath: process.env.CHROME_PATH || (existsSync(macChrome) ? macChrome : undefined),
-  });
+  }); } catch (error) { await server.stop(); await server.cleanup(); throw error; }
+  const safePage = async options => {
+    const p = await browser.newPage(options);
+    await p.route('**/*', route => ['127.0.0.1','localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+    return p;
+  };
   let passed = 0;
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light', timezoneId: 'UTC' });
-    await page.clock.setFixedTime(new Date('2026-11-13T12:00:00Z'));
+    const page = await safePage({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light', timezoneId: 'UTC' });
+    await page.clock.setFixedTime(new Date('2026-11-14T12:00:00Z'));
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    const url = pathToFileURL(path.join(__dirname, '..', 'mockup.html')).href;
-    const submit = () => page.locator('#search').click();
+    const url = server.url;
+    const submit = async () => { await page.locator('#search').click(); await page.waitForFunction(() => !document.querySelector('#search').disabled); };
     const load = async fragment => { await page.goto(url + (fragment ? '#' + fragment : '')); await submit(); };
     const reload = async () => { await page.reload(); await submit(); };
     const rowIDs = () => page.locator('.row[data-id]').evaluateAll(rows => rows.map(r => +r.dataset.id).sort((a, b) => a - b));
@@ -45,25 +50,16 @@ async function main() {
       await submit();
     });
     const baselineIDs = await rowIDs();
-    const courses = await page.evaluate(() => SAMPLE_COURSES);
+    const { normalize } = await import('../../worker/normalize.js');
+    const courses = require('../../worker/fixtures/dhamma/corpus.json').map(normalize).filter(Boolean);
     const baseline = courses.filter(c => baselineIDs.includes(c.id));
-    const places = await page.evaluate(() => PLACES);
+    const { PLACES: places } = await import('../places.js');
     const defaultOrder = ['location', 'dates', 'type', 'lights', 'apply', 'links'];
-    // Expected results for the fixed 2026-11-13 snapshot, after availability filtering.
-    const expected = {
-      default: [170812,173480,178579,178834,179699,184342,189006,189553,192996,195567,196047,203260,211777,212474,212514,212539,212733,213112,213436,213573,213611,215697,216596,220827,221889,222097,225337,226538,238047,238950],
-      combined: [186197,211409,213436,214853,222755,223233,225046,227058,229566,231500,231635,232202,232669,233340,233762,234406,235631,236563,236807,237910],
-      americas: [178579,178686,179699,189006,189101,196047,203260,211777,212474,212514,212733,213112,213611,214565,226538,231067,231792,232202,232703,232950,233511,233938,234406,235258,235631,235832,236563,236791,237338,237910],
-      americasEurope: [170812,170814,177208,178579,178686,178834,179699,184006,184342,189006,189553,189554,191225,196047,197325,203260,203771,211409,211777,212474,212514,212733,213112,213611,214565,219344,222243,226538,232492,233193],
-      europe: [170812,170814,177208,178834,184006,184342,189553,189554,191225,197325,203771,211409,219344,222243,227058,232492,233193,233340,238401],
-      washington: [178686,232703],
-      dhara: [189006,189101,233511],
-      venue: [226538],
-    };
+    const expected = require('../../worker/fixtures/dhamma/browser-expected.json');
 
     await check('From defaults to the local day and preserves an explicit shared date', async () => {
       for (const [timezoneId, expected] of [['America/Los_Angeles', '2026-11-13'], ['Pacific/Auckland', '2026-11-14']]) {
-        const localPage = await browser.newPage({ timezoneId });
+        const localPage = await safePage({ timezoneId });
         try {
           await localPage.clock.setFixedTime(new Date('2026-11-14T00:30:00Z'));
           await localPage.goto(url);
@@ -77,7 +73,7 @@ async function main() {
 
     await check('desktop grid, type groups, buttons, icons and local square flags', async () => {
       assert.deepEqual(baselineIDs, expected.default);
-      assert.match(await page.locator('#search-limit').innerText(), /first 30 matches/);
+      assert.match(await page.locator('#search-limit').innerText(), /first 50 matches/);
       assert.deepEqual(await order(), defaultOrder);
       assert.deepEqual(await page.locator('#types input').evaluateAll(inputs => inputs.map(i => i.value)),
         ['3D', '10D', '10D OS', 'EXEC', 'STP', '14D/TSC', '10D SPCL', '20D', '30D', '45D', '60D']);
@@ -98,7 +94,7 @@ async function main() {
       const submittedSummary = await page.locator('#summary').innerText();
       await page.locator('[name=from]').fill('2026-12-01');
       await page.locator('[name=as]').selectOption('OM');
-      await page.locator('[name=lang]').selectOption('English');
+      await page.locator('[name=lang]').selectOption('en');
       await page.locator('[name=centers]').check();
       await page.locator('[name=wait]').uncheck();
       await page.locator('[name=soon]').uncheck();
@@ -120,58 +116,6 @@ async function main() {
       assert.equal(submitted.get('as'), 'OM');
       assert.equal(submitted.get('from'), '2026-12-01');
       assert.doesNotMatch(await page.locator('#search-status').innerText(), /Filters changed/);
-      await load();
-    });
-
-    await check('Search keeps scanning after three pages, caps matches, and runs afresh', async () => {
-      await page.evaluate(() => {
-        const base = SAMPLE_COURSES.find(c => c.type === '10-Day');
-        const fixture = Array.from({ length: 105 }, (_, i) => ({
-          ...base, id: 999000 + i, start: '2026-11-20', end: '2026-12-01', enroll: '2026-10-01',
-          comments: '', hasNotes: false,
-          langs: i >= 10 && i < 20 ? ['French'] : ['English'],
-          loc: { ...base.loc, center: !(i >= 20 && i < 30), name: 'Fixture ' + String(i).padStart(3, '0') },
-          status: i < 10 ? [{ type: null, status: 'In Progress', color: 'NONE' }]
-            : i >= 30 && i < 40 ? [{ type: 'om', status: 'Wait List', color: 'Yellow' }]
-            : [{ type: i >= 40 && i < 50 ? 'nm' : 'om', status: 'Open', color: 'Green' }],
-        }));
-        SAMPLE_COURSES.splice(0, SAMPLE_COURSES.length, ...fixture);
-      });
-      await page.locator('[name=as]').selectOption('OM');
-      await page.locator('[name=lang]').selectOption('English');
-      await page.locator('[name=centers]').check();
-      await page.locator('[name=wait]').uncheck();
-      await page.locator('[name=soon]').uncheck();
-      await submit();
-      assert.deepEqual(await rowIDs(), Array.from({ length: 30 }, (_, i) => 999050 + i));
-      await page.evaluate(() => { SAMPLE_COURSES[50].status = [{ type: null, status: 'Closed', color: 'Red' }]; });
-      await submit();
-      assert.deepEqual(await rowIDs(), Array.from({ length: 30 }, (_, i) => 999051 + i));
-    });
-
-    await check('target truncation is partial; exhausted and empty searches are clear', async () => {
-      await page.evaluate(() => {
-        for (const [i, course] of SAMPLE_COURSES.entries()) {
-          course.status = [{ type: null, status: i < 90 ? 'Closed' : 'Open', color: i < 90 ? 'Red' : 'Green' }];
-        }
-      });
-      await submit();
-      assert.deepEqual(await rowIDs(), Array.from({ length: 10 }, (_, i) => 999090 + i));
-      assert.match(await page.locator('#search-limit').innerText(), /Partial results/);
-      await page.evaluate(() => {
-        const courses = SAMPLE_COURSES.slice(90, 92);
-        SAMPLE_COURSES.splice(0, SAMPLE_COURSES.length, courses[0], courses[0], courses[1]);
-      });
-      await submit();
-      assert.deepEqual(await rowIDs(), [999090, 999091], 'duplicate course IDs must count once');
-      assert.ok(await page.locator('#search-limit').isHidden());
-      await page.evaluate(() => {
-        for (const course of SAMPLE_COURSES) course.status = [{ type: null, status: 'Closed', color: 'Red' }];
-      });
-      await submit();
-      assert.equal(await page.locator('.row[data-id]').count(), 0);
-      assert.match(await page.locator('#list .empty').innerText(), /No courses/);
-      await reload();
       await load();
     });
 
@@ -343,7 +287,7 @@ async function main() {
         assert.equal(dimensions.locationX, dimensions.flagX);
       }
       assert.match(await page.locator('h2').first().textContent(), /^2026 November/);
-      if (process.env.SIT_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SIT_SCREENSHOT_DIR, 'sit-scroll.png') });
+      if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-scroll.png') });
       await page.evaluate(() => scrollTo(0, 0));
     });
 
@@ -353,19 +297,116 @@ async function main() {
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
       await reload();
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
-      if (process.env.SIT_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SIT_SCREENSHOT_DIR, 'sit-dark.png') });
+      if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-dark.png') });
       await page.locator('#theme').click();
       await page.locator('#theme').blur();
-      if (process.env.SIT_SCREENSHOT_DIR) {
-        await page.screenshot({ path: path.join(process.env.SIT_SCREENSHOT_DIR, 'sit-desktop.png') });
+      if (process.env.SITSERVE_SCREENSHOT_DIR) {
+        await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-desktop.png') });
         await page.setViewportSize({ width: 390, height: 844 });
-        await page.screenshot({ path: path.join(process.env.SIT_SCREENSHOT_DIR, 'sit-mobile.png') });
+        await load();
+        await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-mobile.png') });
       }
       assert.deepEqual(errors, []);
+    });
+    await check('Search button states preserve pending edits in both themes', async () => {
+      await page.goto(url);
+      assert.equal(await page.locator('#search').getAttribute('data-state'), 'initial');
+      await submit();
+      assert.equal(await page.locator('#search').getAttribute('data-state'), 'complete');
+      const original = await page.locator('[name=from]').inputValue();
+      for (const theme of ['light', 'dark']) {
+        if (await page.locator('html').getAttribute('data-theme') !== theme) await page.locator('#theme').click();
+        await page.locator('[name=from]').fill('2027-01-01');
+        assert.equal(await page.locator('#search').getAttribute('data-state'), 'pending');
+        assert.match(await page.locator('#search-status').innerText(), /Filters changed/);
+        await page.locator('[name=from]').fill(original);
+        assert.equal(await page.locator('#search').getAttribute('data-state'), 'complete');
+        assert.equal(await page.locator('#search').isEnabled(), true);
+      }
+    });
+    await check('location photo hover uses the local proxy placeholder', async () => {
+      await load();
+      await page.locator('.row[data-id] .name[data-photo]').first().hover();
+      assert.ok(await page.locator('#photo').isVisible());
+      assert.match(await page.locator('#photo img').getAttribute('src'), /^\/photo\/(?:system\/images|assets)\//);
+      await page.waitForFunction(() => document.querySelector('#photo img').complete && document.querySelector('#photo img').naturalWidth > 0);
+    });
+    await check('old language names restore ISO codes and empty results are clear', async () => {
+      await load('lang=English&where=sublocation_2156');
+      assert.equal(await page.locator('[name=lang]').inputValue(), 'en');
+      assert.equal(await page.locator('.row[data-id]').count(), 0);
+      assert.match(await page.locator('#list .empty').innerText(), /No courses/);
+      assert.match(await page.locator('#checked').innerText(), /Checked/);
+      assert.equal(await page.locator('#mode').innerText(), 'simulated data');
+    });
+    const hosted = async (vars, run) => {
+      const local = await startServer({ vars });
+      const p = await safePage({ viewport: { width: 1440, height: 1000 }, timezoneId: 'UTC' });
+      await p.clock.setFixedTime(new Date('2026-11-14T12:00:00Z'));
+      try { await p.goto(local.url); await run(p, local); }
+      finally { await p.close(); await local.stop(); await local.cleanup(); }
+    };
+    await check('streams rows during loading, disables Search, preserves submitted As while editing', async () => {
+      await hosted({ SIMULATOR_DELAY_MS: '120', UPSTREAM_SPACING_MS: '150' }, async p => {
+        await p.locator('#search').click();
+        await p.waitForFunction(() => document.querySelector('#search').disabled);
+        assert.equal(await p.locator('#search').getAttribute('data-state'), 'loading');
+        await p.waitForFunction(() => document.querySelectorAll('.row[data-id]').length > 0 && document.querySelector('#search').disabled);
+        assert.match(await p.locator('#search-status').innerText(), /Searching… through/);
+        await p.locator('[name=as]').selectOption('SF');
+        assert.equal(await p.locator('#list').getAttribute('data-as'), 'any');
+        await p.waitForFunction(() => !document.querySelector('#search').disabled);
+        assert.equal(await p.locator('.row[data-id]').count(), 50);
+        assert.match(await p.locator('#search-limit').innerText(), /first 50 matches/);
+        assert.equal(await p.locator('#search').getAttribute('data-state'), 'pending');
+        assert.match(await p.locator('#search-status').innerText(), /Filters changed/);
+        assert.equal(await p.locator('#list').getAttribute('data-as'), 'any');
+      });
+    });
+    await check('Cancel aborts the stream; superseding submission cannot display stale rows', async () => {
+      await hosted({ SIMULATOR_DELAY_MS: '100', UPSTREAM_SPACING_MS: '150' }, async (p, local) => {
+        await p.locator('#search').click();
+        await p.waitForFunction(() => document.querySelectorAll('.row[data-id]').length > 0 && document.querySelector('#search').disabled);
+        await p.locator('#cancel').click();
+        await p.waitForFunction(() => !document.querySelector('#search').disabled);
+        assert.match(await p.locator('#search-limit').innerText(), /cancelled/i);
+        const count = await p.locator('.row[data-id]').count();
+        await p.waitForTimeout(350);
+        assert.equal(await p.locator('.row[data-id]').count(), count);
+        await p.locator('#search').click();
+        await p.locator('[name=as]').selectOption('SF');
+        await p.evaluate(() => document.querySelector('#filters').dispatchEvent(new Event('submit', { cancelable: true })));
+        await p.waitForFunction(() => !document.querySelector('#search').disabled);
+        assert.equal(await p.locator('#list').getAttribute('data-as'), 'SF');
+        assert.equal(new URLSearchParams(new URL(p.url()).hash.slice(1)).get('as'), 'SF');
+        assert.equal((await (await fetch(local.url + '/api/debug')).json()).activeSearches, 0);
+      });
+    });
+    await check('page cap is clearly partial and suggests a later From or narrower filters', async () => {
+      await hosted({ SIMULATOR_SCENARIO: 'sparse' }, async p => {
+        await p.locator('#search').click(); await p.waitForFunction(() => !document.querySelector('#search').disabled);
+        assert.equal(await p.locator('.row[data-id]').count(), 1);
+        assert.match(await p.locator('#search-limit').innerText(), /Partial results.*Searched through.*later From.*narrower filters/);
+      });
+    });
+    await check('SIMULATOR_FAULT errors and paused states require explicit Search retry', async () => {
+      await hosted({ SIMULATOR_FAULT: 'html' }, async (p, local) => {
+        const submitFault = async () => { await p.locator('#search').click(); await p.waitForFunction(() => !document.querySelector('#search').disabled); };
+        await submitFault();
+        assert.match(await p.locator('#search-limit').innerText(), /non-JSON/);
+        assert.match(await p.locator('#search-status').innerText(), /Search to retry/);
+        await p.waitForTimeout(150);
+        assert.equal((await (await fetch(local.url + '/api/debug')).json()).simulatorRequests, 1);
+        await submitFault();
+        assert.match(await p.locator('#search-limit').innerText(), /paused/i);
+        assert.equal((await (await fetch(local.url + '/api/debug')).json()).simulatorRequests, 1);
+      });
     });
     console.log(`${passed} browser checks passed.`);
   } finally {
     await browser.close();
+    await server.stop();
+    await server.cleanup();
   }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

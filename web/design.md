@@ -1,12 +1,10 @@
-# sit web: design and handoff
+# sitserve: design
 
-A single page for finding Vipassana courses on dhamma.org that you can still sign up for. It
-updates results when you submit Search, showing up to 50 matches after all filters (the mockup
-still stops at 30). `web/mockup.html` is a working mockup that runs on a sample of real courses
-in `web/mockup-data.js`. It's plain HTML, CSS and JS in one file: no framework and no build
-step. Flags are local assets; location photos load from dhamma.org on hover. This project is a
-website; the live-data backend will be a JavaScript Cloudflare Worker. The Go CLI and its index
-package have been removed.
+A single page for finding Vipassana courses on dhamma.org that you can still sign up for.
+`web/index.html` and `web/app.js` are plain HTML, CSS and ES modules: no framework or page build
+step. A Cloudflare Worker streams up to 50 matches after all filters. Flags are local assets;
+location photos use the same-origin Worker proxy. Local development uses saved real responses
+and a simulator, identified by a small “simulated data” badge.
 
 ## Filter bar (sticky, top)
 
@@ -40,14 +38,22 @@ package have been removed.
   position, highlights its light column, and enlarges its lights from 8px to 10px. Other
   positions' lights are dimmed to 28% opacity. Anyone restores all lights to their normal size
   and opacity. The legend remains unchanged.
-- **Language** (one instruction language) and **centers only**.
+- **Language** (one instruction language) and **centers only**. The select shows names and stores
+  upstream ISO codes; old links such as `lang=English` restore as `lang=en`.
 - **Also show**: wait lists (on by default) and not open yet (on by default).
 - **Theme switch**, top right: light/dark. The page follows the system until the switch is
   clicked, then remembers the choice in localStorage.
 - **Search**: submits all filters together. No automatic search on filter changes, place
-  selection, page load or URL restoration. Pending edits leave the submitted results in place
-  and show "Filters changed. Press Search to update results." Column reordering and theme
-  changes preserve the submitted filters too.
+  selection, page load or URL restoration. The compact button says **Search** in its resting
+  states: solid blue with a search icon before the first submission; quiet outlined with a
+  checkmark when the visible results match the filters; solid amber with a refresh icon when
+  filters change. The amber background is distinct in both themes. Pending edits leave the
+  submitted results in place and show "Filters changed. Press Search to update results." in
+  yellow with a warning icon, in both themes. Restoring the submitted filters restores the
+  completed state; the button remains clickable to run the search again. While loading it says
+  “Searching…”, is disabled, and shows progress through the last searched date. Cancel stops the
+  stream. Edits during loading preserve the submitted results and show the pending warning.
+  Column reordering and theme changes preserve the submitted filters too.
 - Submitted filters live in the URL fragment, so a search can be bookmarked or shared.
   Opening a link restores the form; press Search to retrieve results.
 
@@ -65,8 +71,8 @@ package have been removed.
   date. At 50 matches, suggest changing the filters to find others; there is no pagination or
   Load more. A search stopped early by its page cap is partial: mark it clearly ("Searched
   through Dec 3") and suggest a later From or narrower filters. Show when the results were
-  checked ("Checked 12 min ago"). The mockup simulates a 30-match limit and marks results
-  partial after 100 raw courses; update it to these rules.
+  checked ("Checked 12 min ago"). The backend enforces the same page cap for cached and fresh
+  pages; cursor and same-date stops are also reported as partial.
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
   bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
   Keep full month names and align these group headings to the left edge of the table, rather
@@ -83,7 +89,8 @@ package have been removed.
      - Flags are 16×16px local SVGs from `flag-icons` v7.3.2, with 2px corners and a fine edge.
        They use 78% opacity and 75% saturation to blend with the quiet rows; hovering restores
        their full color. The 29 countries in the snapshot are saved under `assets/flags/`, with
-       the upstream MIT license and a source/hash manifest. Keep the flag inside the Location
+       the upstream MIT license and a source/hash manifest. Countries without a local asset use
+       a text fallback. Keep the flag inside the Location
        cell so it moves with the name when columns are reordered.
      - Hovering the flag shows the location ("Onalaska, Washington, United States"). For a
        non-center, the venue appears on the line above it.
@@ -194,7 +201,7 @@ codes such as "WA" or "IN".
 - Places combine with OR: courses in any selected place show. Region membership uses
   `LOCATION_REGIONS[loc.id]`; states compare both state and country; locations and venues use
   `loc.id` and `loc.subId` respectively. The data lives in `PLACES`, `LOCATION_REGIONS`, and the
-  course objects in `mockup-data.js`.
+  shared metadata in `places.js` and the normalized course objects.
 
 ## Responsive layout
 
@@ -213,56 +220,35 @@ codes such as "WA" or "IN".
   breakpoint. Preserve fractional pixel heights and overlap adjacent sticky layers by 1px so
   rows cannot peek through a rounding gap between the filters, column headings and month headings.
 
-## Real implementation (next phase)
+## Backend and live UI
 
-- **Server:** a Cloudflare Worker serves the page and `/api/search`. One Durable Object makes
-  every dhamma.org request, with plain HTTP only: no browser cookies, no imitating a browser
-  (see CLAUDE.md). dhamma.org sends no `Access-Control-Allow-Origin` header for our origin
-  (checked 2026-11-13), so the Worker acts as a same-origin proxy. Request pacing, caching and
-  load limits are in [docs/plan.md](../docs/plan.md#live-search).
-- **Query parameters:**
-  - Places go in `regions[]` as `kind_id`.
-  - Course types go in `course_type_constraint[]`, using the IDs in the table above. When As is
-    a new-student position, send only 10D and EXEC.
-  - Language goes in `languages[]` as its ISO code.
-  - `current_state=OldStudents` covers every type.
-  - `daterange` runs from the From date to a fixed end date well past the last listed course.
-    It only returns courses that end inside the range.
-- **Filters:** As, centers only, the two "also show" checkboxes and a re-check of Language
-  apply to each upstream page before a course counts toward 50. dhamma.org's attend/serve and
-  gender filters ignore availability, so they can't replace As.
-- **Limits:** fetch pages in date order and deduplicate by course ID. When a query's 100
-  courses are used up, continue from the last start date. Stop at 50 matches, at the end of
-  the pages, or after 20 pages; a search stopped by the page cap is partial.
-- **What needs a query:** only Search. Form edits, page load, link restoration and display
-  preferences never query.
-- **Storage:** raw upstream pages are cached for 1 hour and shared by all visitors. No course
-  index, bulk download or background refresh. Search responses use `Cache-Control: no-store`.
-  Static place metadata is separate from live course availability.
-- **Payload:** send only the fields the page uses (see the course objects in
-  `mockup-data.js`), with `comments` sanitized.
-- **Metadata:** fetch any needed place search texts, IDs and region nesting from the search
-  page and `/en/locations/directory` using a JavaScript script. The old Go implementation has
-  been removed; `web/tools/places.py` preserves the parsing approach used for the snapshot.
-- **Assets:** the Worker proxies location photos and caches them for several days. Flags are
-  local SVGs and render consistently across operating systems. Download any newly needed flags
-  when expanding the snapshot or preparing live data.
-- **Live UI:** add loading, error and partial-result states; rows appear as upstream pages
-  arrive. Show when the results were checked. Disable duplicate submission while loading and
-  cancel abandoned requests. Preserve the submitted filters if the user edits the form while
-  loading. Retry only through Search. The date filter already defaults to today's local date.
+- `worker/index.js` serves `/api/search` as NDJSON through one SQLite-backed Durable Object.
+  `start` identifies the mode, each `progress` adds rows and a searched-through date, and `done`
+  carries a reason, partial flag and oldest `checkedAt`. `error` includes a message and optional
+  retry delay. See [docs/plan.md](../docs/plan.md) for the full stream contract and limits.
+- Filtering, type IDs, status specificity, applicant columns, defaults and fragment/query parsing
+  live in DOM-free `shared/courses.js`, imported by the page and Worker. Place and language
+  metadata lives in `places.js`; `tools/build-places.js` regenerates it from saved HTML only.
+- Pages are normalized, comments are sanitized on the server and again in the browser, and
+  photos use `/photo/...`. The shared persisted cache lasts 24 hours; photos last seven days.
+  No visitor's search response is cached by HTTP.
+- The upstream request uses `OldStudents`, in-scope type IDs, place keys, an ISO language and
+  a date range ending Dec 31 of the current UTC year plus two. NM/NF restricts requests to
+  10D/EXEC, with zero requests when Course excludes both. As and availability are checked
+  before a result counts; upstream attendee/gender filters cannot replace them.
+- Rows arrive after every page. A search stops at 50 matches, end of pages, a cursor stop, or
+  the 20-page cap. Partial results show “Searched through Dec 3” and suggest a later From or
+  narrower filters. At 50, show “Showing the first 50 matches; change the filters to find others”.
+- Show “Checked 12 min ago” from the oldest page. Empty, error, allowance, paused and visitor
+  limit states are explicit; retry requires Search. Cancel, navigation and newer searches stop
+  abandoned work. Edits during a search remain separate from its submitted filters and URL.
+- `npm run dev` runs the simulator with persistence in `.wrangler/state`. `npm run dev:live`
+  explicitly selects live upstream requests and requires a contact setting. Tests never contact
+  dhamma.org. `worker/fixtures/dhamma/manifest.json` describes the recorded input and oracle.
 
-## Status: where to pick up
+## Status
 
-**Done** in `mockup.html`: Search submission, pending filter edits, up to 30 matches after
-filtering, the Where picker, column dragging and keyboard reordering, phone layout,
-centered color-coded course badges and sorted filter chips, trailing notes icon,
-quiet Apply buttons, subdued square flags, As-focused availability lights, and both themes.
-
-**Next:** build the Cloudflare Worker backend and fetching states described above, and move the
-mockup to the 50-match rules. The page still uses sample data. `docs/plan.md` describes the live
-search and its load limits.
-
-**Mockup data:** `mockup-data.js` is a snapshot taken from dhamma.org on 2026-11-13. It's built
-by `web/tools/mkdata.py` from saved pages: one `do_search` page per course type, plus the search
-and directory pages. The sample remains fixed, but the From filter defaults to today's local date.
+The served page, streamed backend, simulator, persisted gate, local development commands and
+unit/Worker/browser regression suites are implemented. Deployment, access restriction, metadata
+refresh cadence and request-limit tuning remain. Browser execution depends on a local Chrome
+or Playwright Chromium that can launch in the environment.
