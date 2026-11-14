@@ -5,6 +5,12 @@ None of this is a documented public API: these are the endpoints and inline data
 pages use, so they can change without notice. Verified 2026-11-13; pagination, date ranges and
 filters rechecked on 2026-11-14, when `/robots.txt` contained no rules.
 
+dhamma.org's [Terms of Use](https://www.dhamma.org/en/docs/forms/Dhamma.org_Terms_of_Use.pdf),
+a click-through agreement for its online services and APIs, doesn't mention automated access
+(read 2026-11-14). Its acceptable-use policy forbids "intentionally wasting Dhamma.org's
+resources or the time of its volunteers" and "activities that lead to confusing and competing
+Vipassana choices".
+
 Plain HTTP requests work. No cookies, CSRF token or browser headers are needed, and none should be
 sent: don't replay cookies from a browser session (such as Cloudflare's `cf_clearance`) or imitate
 a browser.

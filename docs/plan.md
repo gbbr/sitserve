@@ -83,9 +83,14 @@ All of these are enforced in the Durable Object.
 - **Identity:** plain HTTP with no browser cookies and no browser imitation, and a User-Agent
   that names the site and gives a contact address. Log upstream requests per hour to tune
   these limits.
-- **Contact:** before building the backend, write to dhamma.org's webmasters describing these
-  limits and the date cursor, which reaches past their search's 100-course limit. If they
-  object to the cursor, stop at that limit and show partial results.
+
+### Audience
+
+For now the site is private: a few invited people use it, and access is restricted (for
+example with Cloudflare Access) so nobody else can spend the allowance. The load limits above
+apply from the first deployment. Before opening the site to more people, write to dhamma.org's
+webmasters describing these limits and the date cursor, which reaches past their search's
+100-course limit. If they object to the cursor, stop at that limit and show partial results.
 
 ### Page and assets
 
@@ -117,7 +122,6 @@ All of these are enforced in the Durable Object.
 
 ## Still to decide
 
-- Deployment setup: Wrangler configuration and domain.
+- Deployment setup: Wrangler configuration, domain and access restriction.
 - Exact pacing, allowance and per-visitor limits, tuned from the request logs.
-- Whether to keep the date cursor, depending on dhamma.org's reply.
 - Refresh cadence and storage for place metadata.
