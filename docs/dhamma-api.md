@@ -2,7 +2,8 @@
 
 Data sources on www.dhamma.org for the website's sample data and future JavaScript backend.
 None of this is a documented public API: these are the endpoints and inline data the site's own
-pages use, so they can change without notice. Verified 2026-11-13.
+pages use, so they can change without notice. Verified 2026-11-13; pagination, date ranges and
+filters rechecked on 2026-11-14, when `/robots.txt` contained no rules.
 
 Plain HTTP requests work. No cookies, CSRF token or browser headers are needed, and none should be
 sent: don't replay cookies from a browser session (such as Cloudflare's `cf_clearance`) or imitate
@@ -36,23 +37,43 @@ curl -s -X POST https://www.dhamma.org/en-US/courses/do_search \
 
 | Parameter | Notes |
 |---|---|
-| `current_state` | Search mode: `NewStudents`, `OldStudents`, `Children`, `ChildrenAnapana` or `Executives`. |
+| `current_state` | Search mode: `NewStudents`, `OldStudents`, `Children`, `ChildrenAnapana` or `Executives`. For course type 3, `NewStudents` and `OldStudents` returned the same 3,531 courses: the mode sets which types the site offers, not which courses match. |
 | `course_type_constraint[]` | Course type IDs, repeatable (see [Course type IDs](#course-type-ids)). **Required:** without it every search returns 0 results. The site sends all types of the current mode. |
-| `daterange` | `YYYY-MM-DD - YYYY-MM-DD` |
+| `daterange` | `YYYY-MM-DD - YYYY-MM-DD`. Returns courses that start on or after the first date and end on or before the second: `2026-12-02 - 2026-12-03` returned nothing, while `2026-12-02 - 2026-12-14` returned 10-day courses running Dec 2–13. A later first date works as a cursor past the 100-course limit. |
 | `regions[]` | Optional, repeatable; matches courses in any of them. Format `<kind>_<id>`, see [Place IDs](#place-ids). Omit to search worldwide. |
-| `page` | 1-based |
+| `page` | 1-based. A page past the last one returns the last page: `page=11` returned page 10. |
 | `sort_column`, `sort_direction`, `date_format` | The site sends `dates`, `up` and `YYYY-MM-DD`; other values untested. |
-| `languages[]`, `course_types[]`, `attendee_types[]`, `genders[]` | Sent by the site's filter widgets; value formats untested. |
+| `languages[]` | ISO codes from the search page's language list, e.g. `en`. Narrows results: a two-year worldwide 10-day search went from 4,069 to 3,928 courses, and its first page held only courses with English among their instruction languages. |
+| `attendee_types[]` | `Attend` or `Serve`. Narrows results (`sit`'s in-scope types worldwide for one year: 4,681 → 4,421 and 4,359) but ignores availability: full, closed and in-progress courses still appear. Which courses it removes is unverified. |
+| `genders[]` | `Male` or `Female`, the option text the site sends. Accepted, but totals and courses were unchanged. |
+| `course_types[]` | Sent by the site's course type widget; value format untested. |
 
 ### Limits
 
 - 10 courses per page and at most 10 pages, so one query returns at most 100 courses.
   `total_rows` still gives the full count, and `pages_truncated` is `true` when it's over 100.
-  Broader queries have to be split, e.g. by date range.
+  Broad queries reach this quickly: the first 100 worldwide 10-day courses from 2026-11-14 all
+  started by Nov 21. `sit` continues with a new query from the last returned start date, within
+  a per-search page cap (see [plan.md](plan.md#live-search)).
 - Typical sizes for one year from 2026-11-13: new-student courses worldwide 3,487; in the
-  Americas 441; long courses (IDs 66, 4, 11, 12, 23, 6, 21) worldwide 278.
-- The site's script sets `page_size: 10` but doesn't send it. Whether the server accepts a page
-  size parameter is untested.
+  Americas 441; long courses (IDs 66, 4, 11, 12, 23, 6, 21) worldwide 278. All of `sit`'s
+  in-scope types worldwide for one year from 2026-11-14: 4,681.
+- The page size is fixed at 10: `page_size` and `per_page` are ignored. The site's script sets
+  `page_size: 10` but doesn't send it.
+
+### Live pagination check (2026-11-14)
+
+A worldwide `OldStudents` query with all of `sit`'s in-scope types and date range
+`2026-11-14 - 2027-11-14` reached 30 usable matches on page 4. Those four pages contained 40
+courses: 33 with an open or wait-list position, four in progress and one cancelled, plus two
+closed courses. The in-progress courses all started on 2026-11-14; no course in these pages
+started before the requested From date. A start date of today does not mean registration is
+still open: courses starting today can already be in progress in the location's local time.
+
+This is one observed query, not a guarantee. Narrower applicant, language or availability
+filters can use up a query's 100 courses with few matches, even when `total_rows` reports many
+more; the date cursor then continues from a later start date. The result limit is a maximum,
+and searches stopped by the page cap must be identified as partial.
 
 ### Response
 
@@ -76,7 +97,7 @@ Useful course fields:
 | `apply_link_url` | `"/portal/student_apps/new_app?course_id=…&location_id=…"` | Site-relative. |
 | `app_page_url` | `"https://schedule.vridhamma.org/form/…"` | External application form (Indian centers); empty otherwise. |
 | `comments` | HTML | Notes from the location. |
-| `location` | object | Same fields as the [location API](#location-details-get-enapiv1locationsidjson), plus `sub_location` and `sub_location_id` naming the venue when the location has several. |
+| `location` | object | Same fields as the [location API](#location-details-get-enapiv1locationsidjson), plus `sub_location` and `sub_location_id` naming the venue when the location has several. `header_image_path` is the site-relative photo: `/system/images/centers/<name>.jpg`, or a default image under `/assets/`. |
 
 `location.haversine_distance` is always `null`, and no distance parameter is known.
 
@@ -167,3 +188,5 @@ structured data.
   executive, Satipatthana and 1-day courses. Filter by course type instead.
 - There's no distance filter. Pick nearby locations using the cached coordinates and pass them as
   several `regions[]=location_<id>`.
+- The site's applicant filters are attend/serve and gender, and neither considers availability.
+  `sit`'s As filter (new / old / server × male / female) checks that position's status itself.

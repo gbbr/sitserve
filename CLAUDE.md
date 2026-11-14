@@ -2,7 +2,8 @@
 
 A website for finding Vipassana courses listed on dhamma.org that you can still sign up for.
 Work in `web/`: `mockup.html` is plain HTML, CSS and JavaScript, using `mockup-data.js` as a
-fixed sample. There is no framework or build step. The future live-data backend will be JavaScript.
+fixed sample. There is no framework or build step. The future live-data backend will be a
+JavaScript Cloudflare Worker.
 
 - Current design decisions and handoff: @web/design.md
 - Website implementation plan: @docs/plan.md

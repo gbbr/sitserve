@@ -1,17 +1,19 @@
 # sit web: design and handoff
 
 A single page for finding Vipassana courses on dhamma.org that you can still sign up for. It
-re-renders as you change the filters at the top. `web/mockup.html` is a working mockup that runs
-on a sample of real courses in `web/mockup-data.js`. It's plain HTML, CSS and JS in one file:
-no framework and no build step. Flags are local assets; location photos load from dhamma.org
-on hover. This project is a website; the live-data backend will be JavaScript. The Go CLI and
-its index package have been removed.
+updates results when you submit Search, showing up to 50 matches after all filters (the mockup
+still stops at 30). `web/mockup.html` is a working mockup that runs on a sample of real courses
+in `web/mockup-data.js`. It's plain HTML, CSS and JS in one file: no framework and no build
+step. Flags are local assets; location photos load from dhamma.org on hover. This project is a
+website; the live-data backend will be a JavaScript Cloudflare Worker. The Go CLI and its index
+package have been removed.
 
 ## Filter bar (sticky, top)
 
 - **Where**: places as chips; see [Where box](#where-box). Courses in any chosen place show.
 - **From**: start date, default the viewer's current local calendar date. Preserve a date
-  explicitly supplied in the URL fragment. No end date: every course from then on.
+  explicitly supplied in the URL fragment. No end date control: search courses starting from
+  that date, earliest first.
 - **Course**: toggle chips; any number can be on, and none on means all. The page covers only:
 
   | Chip | Full name | `raw_course_type` | Search ID |
@@ -42,7 +44,12 @@ its index package have been removed.
 - **Also show**: wait lists (on by default) and not open yet (on by default).
 - **Theme switch**, top right: light/dark. The page follows the system until the switch is
   clicked, then remembers the choice in localStorage.
-- Filters live in the URL fragment, so a search can be bookmarked or shared.
+- **Search**: submits all filters together. No automatic search on filter changes, place
+  selection, page load or URL restoration. Pending edits leave the submitted results in place
+  and show "Filters changed. Press Search to update results." Column reordering and theme
+  changes preserve the submitted filters too.
+- Submitted filters live in the URL fragment, so a search can be bookmarked or shared.
+  Opening a link restores the form; press Search to retrieve results.
 
 ## Course list
 
@@ -53,6 +60,13 @@ its index package have been removed.
   no "N hidden" count.
 - **Summary line:** "N courses you can sign up for", plus a legend: the blue non-center dot and
   the open / wait list / long wait list / closed lights.
+- **Result limit:** collect up to 50 courses that pass every filter, fetching more upstream
+  pages when needed and continuing past the target's 100-course query limit with a later start
+  date. At 50 matches, suggest changing the filters to find others; there is no pagination or
+  Load more. A search stopped early by its page cap is partial: mark it clearly ("Searched
+  through Dec 3") and suggest a later From or narrower filters. Show when the results were
+  checked ("Checked 12 min ago"). The mockup simulates a 30-match limit and marks results
+  partial after 100 raw courses; update it to these rules.
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
   bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
   Keep full month names and align these group headings to the left edge of the table, rather
@@ -166,8 +180,8 @@ codes such as "WA" or "IN".
 - Each suggestion shows a tag (continent / region / country / state / center / non-center /
   venue), and regions also show how many locations they contain.
 - With nothing typed, the suggestions are the continents.
-- Already-selected places are excluded from suggestions. Typing alone does not filter the
-  courses; a place must be selected. A clear empty state appears when nothing matches.
+- Already-selected places are excluded from suggestions. Select a place, then submit Search
+  to apply it to courses. A clear empty state appears when no suggestions match.
 
 **Using it:**
 - Keyboard: the arrows move through suggestions, Enter picks one, Escape closes the list, and
@@ -175,8 +189,8 @@ codes such as "WA" or "IN".
 - Each chip shows the place name, its full text on hover, and × to remove it.
 - Clicking outside or tabbing away closes the suggestions. The input exposes combobox/listbox
   semantics and the active option, and result counts are announced to assistive technology.
-- Store selected keys (`region_402,location_1542,…`) in the hidden `where` value and the URL
-  fragment. Remove duplicate and unknown keys when restoring a link.
+- Store selected keys (`region_402,location_1542,…`) in the hidden `where` value and, on Search,
+  the URL fragment. Remove duplicate and unknown keys when restoring a link.
 - Places combine with OR: courses in any selected place show. Region membership uses
   `LOCATION_REGIONS[loc.id]`; states compare both state and country; locations and venues use
   `loc.id` and `loc.subId` respectively. The data lives in `PLACES`, `LOCATION_REGIONS`, and the
@@ -201,42 +215,53 @@ codes such as "WA" or "IN".
 
 ## Real implementation (next phase)
 
-- **Server:** a small JavaScript server or serverless function serves the page and `/api/search`,
-  which calls dhamma.org's
-  `do_search` with plain HTTP only: no browser cookies, no imitating a browser (see
-  CLAUDE.md). On 2026-11-13, a normal search POST with Origin `http://localhost:8000` returned
-  JSON without `Access-Control-Allow-Origin`, so browser JavaScript at that origin cannot read
-  it directly. The backend acts as a same-origin proxy.
+- **Server:** a Cloudflare Worker serves the page and `/api/search`. One Durable Object makes
+  every dhamma.org request, with plain HTTP only: no browser cookies, no imitating a browser
+  (see CLAUDE.md). dhamma.org sends no `Access-Control-Allow-Origin` header for our origin
+  (checked 2026-11-13), so the Worker acts as a same-origin proxy. Request pacing, caching and
+  load limits are in [docs/plan.md](../docs/plan.md#live-search).
 - **Query parameters:**
   - Places go in `regions[]` as `kind_id`.
-  - Course types go in `course_type_constraint[]`, using the IDs in the table above.
+  - Course types go in `course_type_constraint[]`, using the IDs in the table above. When As is
+    a new-student position, send only 10D and EXEC.
+  - Language goes in `languages[]` as its ISO code.
   - `current_state=OldStudents` covers every type.
-  - `daterange` runs from the From date to an end date well past the last listed course.
-- **Limits:** one query returns at most 100 courses. When `total_rows` is higher, split the
-  date range. Fetch pages one at a time with a pause, stream results to the page, and
-  consider a short in-memory cache.
-- **What needs a query:** only Where, From and Course need a new server query. As, Language,
-  centers only and the two "also show" checkboxes filter in the browser.
+  - `daterange` runs from the From date to a fixed end date well past the last listed course.
+    It only returns courses that end inside the range.
+- **Filters:** As, centers only, the two "also show" checkboxes and a re-check of Language
+  apply to each upstream page before a course counts toward 50. dhamma.org's attend/serve and
+  gender filters ignore availability, so they can't replace As.
+- **Limits:** fetch pages in date order and deduplicate by course ID. When a query's 100
+  courses are used up, continue from the last start date. Stop at 50 matches, at the end of
+  the pages, or after 20 pages; a search stopped by the page cap is partial.
+- **What needs a query:** only Search. Form edits, page load, link restoration and display
+  preferences never query.
+- **Storage:** raw upstream pages are cached for 1 hour and shared by all visitors. No course
+  index, bulk download or background refresh. Search responses use `Cache-Control: no-store`.
+  Static place metadata is separate from live course availability.
 - **Payload:** send only the fields the page uses (see the course objects in
   `mockup-data.js`), with `comments` sanitized.
 - **Metadata:** fetch any needed place search texts, IDs and region nesting from the search
   page and `/en/locations/directory` using a JavaScript script. The old Go implementation has
   been removed; `web/tools/places.py` preserves the parsing approach used for the snapshot.
-- **Assets:** photos are hotlinked from dhamma.org; the server could proxy them. Flags are local
-  SVGs and render consistently across operating systems. Download any newly needed flags when
-  expanding the snapshot or preparing live data.
-- **Live UI:** add loading, error and partial-result states and cancel superseded requests.
-  The date filter already defaults to today's local date. A backend framework and hosting
-  provider have not been chosen.
+- **Assets:** the Worker proxies location photos and caches them for several days. Flags are
+  local SVGs and render consistently across operating systems. Download any newly needed flags
+  when expanding the snapshot or preparing live data.
+- **Live UI:** add loading, error and partial-result states; rows appear as upstream pages
+  arrive. Show when the results were checked. Disable duplicate submission while loading and
+  cancel abandoned requests. Preserve the submitted filters if the user edits the form while
+  loading. Retry only through Search. The date filter already defaults to today's local date.
 
 ## Status: where to pick up
 
-**Done** in `mockup.html`: the filters and Where picker, column dragging and keyboard reordering,
-phone layout, centered color-coded course badges and sorted filter chips, trailing notes icon,
+**Done** in `mockup.html`: Search submission, pending filter edits, up to 30 matches after
+filtering, the Where picker, column dragging and keyboard reordering, phone layout,
+centered color-coded course badges and sorted filter chips, trailing notes icon,
 quiet Apply buttons, subdued square flags, As-focused availability lights, and both themes.
 
-**Next:** build the JavaScript live-data backend and fetching states described above. The page
-still uses sample data. `docs/plan.md` now describes the website and its next implementation phase.
+**Next:** build the Cloudflare Worker backend and fetching states described above, and move the
+mockup to the 50-match rules. The page still uses sample data. `docs/plan.md` describes the live
+search and its load limits.
 
 **Mockup data:** `mockup-data.js` is a snapshot taken from dhamma.org on 2026-11-13. It's built
 by `web/tools/mkdata.py` from saved pages: one `do_search` page per course type, plus the search
