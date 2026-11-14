@@ -21,7 +21,9 @@ async function main() {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const url = pathToFileURL(path.join(__dirname, '..', 'mockup.html')).href;
-    const load = fragment => page.goto(url + (fragment ? '#' + fragment : ''));
+    const submit = () => page.locator('#search').click();
+    const load = async fragment => { await page.goto(url + (fragment ? '#' + fragment : '')); await submit(); };
+    const reload = async () => { await page.reload(); await submit(); };
     const rowIDs = () => page.locator('.row[data-id]').evaluateAll(rows => rows.map(r => +r.dataset.id).sort((a, b) => a - b));
     const order = () => page.locator('.head > [data-column]').evaluateAll(cells => cells.map(c => c.dataset.column));
     const search = page.locator('#place-search');
@@ -34,14 +36,30 @@ async function main() {
       await search.fill(query);
       await page.locator('#place-option-' + key).click();
     };
-    await load();
+    await check('page load waits for an explicit Search', async () => {
+      await page.goto(url);
+      assert.equal(await page.locator('.row[data-id]').count(), 0);
+      assert.equal(await page.locator('#summary').innerText(), 'Ready to search');
+      assert.match(await page.locator('#list').innerText(), /press Search/);
+      assert.ok(await page.locator('#search').isVisible());
+      await submit();
+    });
     const baselineIDs = await rowIDs();
     const courses = await page.evaluate(() => SAMPLE_COURSES);
     const baseline = courses.filter(c => baselineIDs.includes(c.id));
-    const regions = await page.evaluate(() => LOCATION_REGIONS);
     const places = await page.evaluate(() => PLACES);
-    const ids = cs => cs.map(c => c.id).sort((a, b) => a - b);
     const defaultOrder = ['location', 'dates', 'type', 'lights', 'apply', 'links'];
+    // Expected results for the fixed 2026-11-13 snapshot, after availability filtering.
+    const expected = {
+      default: [170812,173480,178579,178834,179699,184342,189006,189553,192996,195567,196047,203260,211777,212474,212514,212539,212733,213112,213436,213573,213611,215697,216596,220827,221889,222097,225337,226538,238047,238950],
+      combined: [186197,211409,213436,214853,222755,223233,225046,227058,229566,231500,231635,232202,232669,233340,233762,234406,235631,236563,236807,237910],
+      americas: [178579,178686,179699,189006,189101,196047,203260,211777,212474,212514,212733,213112,213611,214565,226538,231067,231792,232202,232703,232950,233511,233938,234406,235258,235631,235832,236563,236791,237338,237910],
+      americasEurope: [170812,170814,177208,178579,178686,178834,179699,184006,184342,189006,189553,189554,191225,196047,197325,203260,203771,211409,211777,212474,212514,212733,213112,213611,214565,219344,222243,226538,232492,233193],
+      europe: [170812,170814,177208,178834,184006,184342,189553,189554,191225,197325,203771,211409,219344,222243,227058,232492,233193,233340,238401],
+      washington: [178686,232703],
+      dhara: [189006,189101,233511],
+      venue: [226538],
+    };
 
     await check('From defaults to the local day and preserves an explicit shared date', async () => {
       for (const [timezoneId, expected] of [['America/Los_Angeles', '2026-11-13'], ['Pacific/Auckland', '2026-11-14']]) {
@@ -52,12 +70,14 @@ async function main() {
           assert.equal(await localPage.locator('[name=from]').inputValue(), expected);
           await localPage.goto(url + '#from=2026-12-01');
           assert.equal(await localPage.locator('[name=from]').inputValue(), '2026-12-01');
+          assert.equal(await localPage.locator('.row[data-id]').count(), 0);
         } finally { await localPage.close(); }
       }
     });
 
     await check('desktop grid, type groups, buttons, icons and local square flags', async () => {
-      assert.equal(baselineIDs.length, 137);
+      assert.deepEqual(baselineIDs, expected.default);
+      assert.match(await page.locator('#search-limit').innerText(), /first 30 matches/);
       assert.deepEqual(await order(), defaultOrder);
       assert.deepEqual(await page.locator('#types input').evaluateAll(inputs => inputs.map(i => i.value)),
         ['3D', '10D', '10D OS', 'EXEC', 'STP', '14D/TSC', '10D SPCL', '20D', '30D', '45D', '60D']);
@@ -73,13 +93,95 @@ async function main() {
       assert.ok(await page.locator('.type').first().evaluate(el => getComputedStyle(el).justifyContent === 'center'));
     });
 
+    await check('all filter edits and column reordering preserve the submitted results', async () => {
+      const submittedURL = page.url();
+      const submittedSummary = await page.locator('#summary').innerText();
+      await page.locator('[name=from]').fill('2026-12-01');
+      await page.locator('[name=as]').selectOption('OM');
+      await page.locator('[name=lang]').selectOption('English');
+      await page.locator('[name=centers]').check();
+      await page.locator('[name=wait]').uncheck();
+      await page.locator('[name=soon]').uncheck();
+      await page.locator('#types').getByText('20D', { exact: true }).click();
+      await pick('Americas', 'region_402');
+      assert.deepEqual(await rowIDs(), baselineIDs);
+      assert.equal(page.url(), submittedURL);
+      assert.equal(await page.locator('#summary').innerText(), submittedSummary);
+      assert.match(await page.locator('#search-status').innerText(), /Filters changed/);
+      await page.locator('.column-head[data-column=location]').focus();
+      await page.keyboard.press('Alt+ArrowRight');
+      assert.deepEqual(await rowIDs(), baselineIDs);
+      assert.equal(await page.locator('#list').getAttribute('data-as'), 'any');
+      await page.keyboard.press('Alt+ArrowLeft');
+      await submit();
+      const submitted = new URLSearchParams(new URL(page.url()).hash.slice(1));
+      assert.equal(submitted.get('where'), 'region_402');
+      assert.equal(submitted.get('types'), '20D');
+      assert.equal(submitted.get('as'), 'OM');
+      assert.equal(submitted.get('from'), '2026-12-01');
+      assert.doesNotMatch(await page.locator('#search-status').innerText(), /Filters changed/);
+      await load();
+    });
+
+    await check('Search keeps scanning after three pages, caps matches, and runs afresh', async () => {
+      await page.evaluate(() => {
+        const base = SAMPLE_COURSES.find(c => c.type === '10-Day');
+        const fixture = Array.from({ length: 105 }, (_, i) => ({
+          ...base, id: 999000 + i, start: '2026-11-20', end: '2026-12-01', enroll: '2026-10-01',
+          comments: '', hasNotes: false,
+          langs: i >= 10 && i < 20 ? ['French'] : ['English'],
+          loc: { ...base.loc, center: !(i >= 20 && i < 30), name: 'Fixture ' + String(i).padStart(3, '0') },
+          status: i < 10 ? [{ type: null, status: 'In Progress', color: 'NONE' }]
+            : i >= 30 && i < 40 ? [{ type: 'om', status: 'Wait List', color: 'Yellow' }]
+            : [{ type: i >= 40 && i < 50 ? 'nm' : 'om', status: 'Open', color: 'Green' }],
+        }));
+        SAMPLE_COURSES.splice(0, SAMPLE_COURSES.length, ...fixture);
+      });
+      await page.locator('[name=as]').selectOption('OM');
+      await page.locator('[name=lang]').selectOption('English');
+      await page.locator('[name=centers]').check();
+      await page.locator('[name=wait]').uncheck();
+      await page.locator('[name=soon]').uncheck();
+      await submit();
+      assert.deepEqual(await rowIDs(), Array.from({ length: 30 }, (_, i) => 999050 + i));
+      await page.evaluate(() => { SAMPLE_COURSES[50].status = [{ type: null, status: 'Closed', color: 'Red' }]; });
+      await submit();
+      assert.deepEqual(await rowIDs(), Array.from({ length: 30 }, (_, i) => 999051 + i));
+    });
+
+    await check('target truncation is partial; exhausted and empty searches are clear', async () => {
+      await page.evaluate(() => {
+        for (const [i, course] of SAMPLE_COURSES.entries()) {
+          course.status = [{ type: null, status: i < 90 ? 'Closed' : 'Open', color: i < 90 ? 'Red' : 'Green' }];
+        }
+      });
+      await submit();
+      assert.deepEqual(await rowIDs(), Array.from({ length: 10 }, (_, i) => 999090 + i));
+      assert.match(await page.locator('#search-limit').innerText(), /Partial results/);
+      await page.evaluate(() => {
+        const courses = SAMPLE_COURSES.slice(90, 92);
+        SAMPLE_COURSES.splice(0, SAMPLE_COURSES.length, courses[0], courses[0], courses[1]);
+      });
+      await submit();
+      assert.deepEqual(await rowIDs(), [999090, 999091], 'duplicate course IDs must count once');
+      assert.ok(await page.locator('#search-limit').isHidden());
+      await page.evaluate(() => {
+        for (const course of SAMPLE_COURSES) course.status = [{ type: null, status: 'Closed', color: 'Red' }];
+      });
+      await submit();
+      assert.equal(await page.locator('.row[data-id]').count(), 0);
+      assert.match(await page.locator('#list .empty').innerText(), /No courses/);
+      await reload();
+      await load();
+    });
+
     await check('combined 14D/TSC filter and legacy links select both course types', async () => {
-      const combinedIDs = ids(baseline.filter(c => ['14-DayGratitude', 'TSC'].includes(c.type)));
-      assert.ok(combinedIDs.length > 0);
+      const combinedIDs = expected.combined;
       await page.locator('#types').getByText('14D/TSC', { exact: true }).click();
+      await submit();
       await page.waitForFunction(() => [...document.querySelectorAll('.type-code')].every(el => ['14D', 'TSC'].includes(el.textContent)));
       assert.deepEqual(await rowIDs(), combinedIDs);
-      await page.reload();
+      await reload();
       assert.equal(await page.locator('[name=types][value="14D/TSC"]').isChecked(), true);
       assert.deepEqual(await rowIDs(), combinedIDs);
       for (const code of ['14D', 'TSC']) {
@@ -112,32 +214,36 @@ async function main() {
 
     await check('region selection, OR matching and URL restoration', async () => {
       await pick('Americas', 'region_402');
-      const inAmericas = c => (regions[c.loc.id] || []).includes(402);
-      assert.deepEqual(await rowIDs(), ids(baseline.filter(inAmericas)));
+      await submit();
+      assert.deepEqual(await rowIDs(), expected.americas);
       const europe = places.find(p => p[0] === 'region' && p[2] === 'Europe');
       assert.ok(europe);
       await pick('Europe', 'region_' + europe[1]);
-      assert.deepEqual(await rowIDs(), ids(baseline.filter(c => inAmericas(c) || (regions[c.loc.id] || []).includes(europe[1]))));
+      await submit();
+      assert.deepEqual(await rowIDs(), expected.americasEurope);
       const selected = await page.locator('[name=where]').inputValue();
       assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('where'), selected);
-      await page.reload();
+      await reload();
       assert.equal(await page.locator('.place-chip').count(), 2);
       assert.equal(await page.locator('[name=where]').inputValue(), selected);
       await page.locator('[data-remove-place=region_402]').click();
-      assert.deepEqual(await rowIDs(), ids(baseline.filter(c => (regions[c.loc.id] || []).includes(europe[1]))));
+      assert.equal(await search.getAttribute('aria-expanded'), 'false');
+      assert.deepEqual(await rowIDs(), expected.americasEurope);
+      await submit();
+      assert.deepEqual(await rowIDs(), expected.europe);
     });
 
     await check('state, location and venue membership', async () => {
       await load();
       await pick('Washington', 'state_3951');
-      assert.deepEqual(await rowIDs(), ids(baseline.filter(c => c.loc.state === 'Washington' && c.loc.country === 'United States')));
+      await submit();
+      assert.deepEqual(await rowIDs(), expected.washington);
       await load();
       await pick('dhara', 'location_1542');
-      assert.deepEqual(await rowIDs(), ids(baseline.filter(c => c.loc.id === 1542)));
-      const venue = baseline.find(c => c.loc.subId && places.some(p => p[0] === 'sublocation' && p[1] === c.loc.subId));
-      assert.ok(venue);
-      await load('where=sublocation_' + venue.loc.subId);
-      assert.deepEqual(await rowIDs(), ids(baseline.filter(c => c.loc.subId === venue.loc.subId)));
+      await submit();
+      assert.deepEqual(await rowIDs(), expected.dhara);
+      await load('where=sublocation_2156');
+      assert.deepEqual(await rowIDs(), expected.venue);
       await load('where=unknown_1,location_1542,location_1542');
       assert.equal(await page.locator('[name=where]').inputValue(), 'location_1542');
     });
@@ -163,11 +269,13 @@ async function main() {
 
     await check('As emphasizes the selected lights and anyone restores them', async () => {
       await page.locator('[name=as]').selectOption('OM');
+      await submit();
       await page.waitForFunction(() => document.querySelector('#list').dataset.as === 'OM');
       assert.ok(await page.locator('.l.hl i.light').count() > 0);
       assert.ok(await page.locator('.l.hl i.light').evaluateAll(lights => lights.every(el => getComputedStyle(el).width === '10px' && getComputedStyle(el).opacity === '1')));
       assert.ok(await page.locator('.lights .l:not(.hl) i.light').evaluateAll(lights => lights.every(el => getComputedStyle(el).width === '8px' && getComputedStyle(el).opacity === '0.28')));
       await page.locator('[name=as]').selectOption('any');
+      await submit();
       await page.waitForFunction(() => document.querySelector('#list').dataset.as === 'any');
       assert.ok(await page.locator('.lights i.light').evaluateAll(lights => lights.every(el => getComputedStyle(el).width === '8px' && getComputedStyle(el).opacity === '1')));
     });
@@ -182,14 +290,14 @@ async function main() {
       assert.ok(await page.locator(`.row[data-id="${courseID}"] + .notes`).isVisible());
       const draggedOrder = await order();
       assert.ok(await page.locator('.row[data-id]').evaluateAll((rows, expected) => rows.every(row => JSON.stringify([...row.children].map(c => c.dataset.column)) === JSON.stringify(expected)), draggedOrder));
-      await page.reload();
+      await reload();
       assert.deepEqual(await order(), draggedOrder);
       await page.locator('.column-head[data-column=type]').focus();
       await page.keyboard.press('Alt+ArrowRight');
       assert.equal((await order())[1], 'type');
       assert.equal(await page.locator('.column-head[data-column=type]').evaluate(el => el === document.activeElement), true);
       await page.evaluate(() => localStorage.removeItem('sit.columns'));
-      await page.reload();
+      await reload();
     });
 
     await check('no horizontal overflow at phone, breakpoint and desktop widths', async () => {
@@ -218,9 +326,10 @@ async function main() {
     await check('sticky headers overlap without a seam and titles stay aligned', async () => {
       for (const width of [821, 1024, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
-        await page.evaluate(() => scrollTo(0, 600));
-        await page.waitForFunction(() => scrollY === 600
-          && Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) - document.querySelector('.bar').getBoundingClientRect().height) < .01);
+        const position = await page.evaluate(() => Math.min(300, document.documentElement.scrollHeight - innerHeight));
+        await page.evaluate(position => scrollTo(0, position), position);
+        await page.waitForFunction(position => scrollY === position
+          && Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) - document.querySelector('.bar').getBoundingClientRect().height) < .01, position);
         const dimensions = await page.evaluate(() => {
           const bar = document.querySelector('.bar').getBoundingClientRect();
           const head = document.querySelector('.head').getBoundingClientRect();
@@ -242,7 +351,7 @@ async function main() {
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
       await page.locator('#theme').click();
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
-      await page.reload();
+      await reload();
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
       if (process.env.SIT_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SIT_SCREENSHOT_DIR, 'sit-dark.png') });
       await page.locator('#theme').click();

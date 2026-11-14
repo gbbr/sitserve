@@ -103,6 +103,10 @@
   .chip input:checked + span { border-color: var(--link); background: var(--link); color: var(--bg); }
   .chip input:focus-visible + span { outline: 2px solid var(--link); outline-offset: 1px; }
   .f input[type=checkbox] { margin: 0; }
+  .search-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--muted); font-size: 12px; }
+  #search { height: 30px; padding: 0 16px; border: 1px solid var(--link); border-radius: 6px; background: var(--link); color: var(--bg); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  #search:hover { filter: brightness(.92); }
+  #search:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   #theme { position: absolute; top: 10px; right: 16px; display: grid; place-items: center; width: 30px; height: 28px; padding: 0; border: 1px solid var(--control-border); border-radius: 6px; background: var(--control-bg); color: var(--muted); cursor: pointer; }
   #theme:hover { color: var(--fg); }
   #theme svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -110,6 +114,7 @@
   /* Summary and legend */
   .summary { max-width: 1180px; margin: 0 auto; padding: 12px 24px 4px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; color: var(--muted); font-size: 13px; }
   .summary b { color: var(--fg); }
+  .result-limit { flex-basis: 100%; }
   .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend .sep { width: 1px; height: 12px; background: var(--line); }
@@ -202,7 +207,7 @@
     #filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; padding: 12px 16px; }
     .brand { grid-column: 1 / -1; padding-right: 36px; }
     #theme { top: 12px; }
-    .where-filter, .course-filter, .also-filter { grid-column: 1 / -1; }
+    .where-filter, .course-filter, .also-filter, .search-actions { grid-column: 1 / -1; }
     .where-box { flex: 1; width: auto; }
     .course-filter { align-items: start; }
     .course-filter > .filter-label { padding-top: 3px; }
@@ -266,12 +271,16 @@
       <label class="f"><input type="checkbox" name="wait" checked> wait lists</label>
       <label class="f"><input type="checkbox" name="soon" checked> not open yet</label>
     </span>
+    <span class="search-actions">
+      <button type="submit" id="search">Search</button>
+      <span id="search-status" role="status"></span>
+    </span>
     <button type="button" id="theme"></button>
   </form>
 </div>
 
 <div class="summary">
-  <span id="summary"></span>
+  <span id="summary" role="status"></span>
   <span class="legend">
     <span><i class="kind noncenter"></i>non-center</span>
     <span class="sep"></span>
@@ -280,11 +289,12 @@
     <span><i class="light o"></i>long wait list</span>
     <span><i class="light r"></i>closed</span>
   </span>
+  <span id="search-limit" class="result-limit" hidden></span>
 </div>
 <div id="place-status" class="sr-only" role="status"></div>
 <div id="column-status" class="sr-only" role="status"></div>
 <main id="list"></main>
-<footer>Mockup: a sample of courses from dhamma.org's course search, fetched 13 Nov 2026. Filters run on this sample in the page.</footer>
+<footer>Mockup: a sample of courses from dhamma.org's course search, fetched 13 Nov 2026. Search runs on this sample in the page.</footer>
 
 <div id="photo" hidden><img alt=""><div></div></div>
 <div id="tip" hidden></div>
@@ -483,7 +493,7 @@ function closePlaces() {
 function changePlaces(keys) {
   form.elements.where.value = keys.join(',');
   renderPlaceChips();
-  render();
+  updateSearchStatus();
 }
 
 function pickPlace(p) {
@@ -504,8 +514,10 @@ placeInput.addEventListener('keydown', e => {
     if (placeOptions.hidden) { showPlaces(); return; }
     if (suggestions.length) activatePlace((activePlace + (e.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length, true);
   } else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (!placeOptions.hidden) pickPlace(suggestions[activePlace]);
+    if (!placeOptions.hidden) {
+      e.preventDefault();
+      pickPlace(suggestions[activePlace]);
+    }
   } else if (e.key === 'Escape') {
     e.preventDefault();
     closePlaces();
@@ -531,7 +543,7 @@ $('#place-chips').addEventListener('click', e => {
   if (!button) return;
   changePlaces(chosenPlaces().filter(p => p.key !== button.dataset.removePlace).map(p => p.key));
   placeInput.focus();
-  showPlaces();
+  closePlaces();
 });
 $('#where-box').addEventListener('focusout', e => { if (!e.currentTarget.contains(e.relatedTarget)) closePlaces(); });
 document.addEventListener('pointerdown', e => { if (!e.target.closest('#where-box')) closePlaces(); });
@@ -658,7 +670,7 @@ function matches(c, f) {
   return true;
 }
 
-// Filters live in the form and in the URL fragment, so a search can be bookmarked or shared.
+// Draft filters stay in the form; only submitted filters go in the shareable URL.
 const DEFAULTS = { where: '', from: TODAY, types: '', as: 'any', lang: '', centers: false, wait: true, soon: true };
 // The course types are a set of checkboxes, kept as a comma-separated list of short names.
 function readFilters() {
@@ -728,22 +740,59 @@ function headHTML(f) {
 }
 
 const openNotes = new Set();
+const RESULT_LIMIT = 30;
+// Simulate the target's ten-course pages and ten-page query limit over the fixed sample.
+const SOURCE_PAGE_SIZE = 10, SOURCE_PAGE_LIMIT = 10;
+let searchResult = null;
+
+function updateSearchStatus() {
+  const pending = searchResult && toFragment(readFilters()) !== toFragment(searchResult.filters);
+  $('#search-status').textContent = pending
+    ? 'Filters changed. Press Search to update results.'
+    : 'Up to 30 matching courses per search.';
+}
+
+function searchSample() {
+  const f = readFilters();
+  // These filters can be sent upstream. Apply the others to each page before counting matches.
+  const upstream = { ...f, centers: false, lang: '' };
+  const candidates = SAMPLE_COURSES.filter(c => matches(c, upstream))
+    .sort((a, b) => a.start.localeCompare(b.start) || a.loc.name.localeCompare(b.loc.name));
+  const shown = [], seen = new Set();
+  for (let page = 0; page < SOURCE_PAGE_LIMIT && page * SOURCE_PAGE_SIZE < candidates.length; page++) {
+    for (const c of candidates.slice(page * SOURCE_PAGE_SIZE, (page + 1) * SOURCE_PAGE_SIZE)) {
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      if (!matches(c, f)) continue;
+      const avail = availability(c, f);
+      if (avail) shown.push([c, avail]);
+      if (shown.length === RESULT_LIMIT) break;
+    }
+    if (shown.length === RESULT_LIMIT) break;
+  }
+  searchResult = {
+    filters: f, shown,
+    truncated: shown.length < RESULT_LIMIT && candidates.length > SOURCE_PAGE_SIZE * SOURCE_PAGE_LIMIT,
+  };
+  try { history.replaceState(null, '', '#' + toFragment(f)); } catch { /* not allowed for some file:// URLs */ }
+  closePlaces();
+  updateSearchStatus();
+  render();
+}
 
 function render() {
   hidePhoto();
   hideTip();
   list.style.setProperty('--columns', columnOrder.map(k => DISPLAY_COLUMNS[k].width).join(' '));
-  const f = readFilters();
-  list.dataset.as = f.as;
-  try { history.replaceState(null, '', '#' + toFragment(f)); } catch { /* not allowed for some file:// URLs */ }
-
-  const shown = [];
-  for (const c of SAMPLE_COURSES) {
-    if (!matches(c, f)) continue;
-    const avail = availability(c, f);
-    if (avail) shown.push([c, avail]);
+  const limit = $('#search-limit');
+  if (!searchResult) {
+    summary.textContent = 'Ready to search';
+    list.innerHTML = '<p class="empty">Choose your filters and press Search to find up to 30 matching courses.</p>';
+    limit.hidden = true;
+    return;
   }
-  shown.sort(([a], [b]) => a.start.localeCompare(b.start) || a.loc.name.localeCompare(b.loc.name));
+  const { filters: f, shown, truncated } = searchResult;
+  list.dataset.as = f.as;
 
   const months = new Map();
   for (const item of shown) {
@@ -756,7 +805,7 @@ function render() {
         const [y, m] = ymd(key);
         return `<h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}`;
       }).join('')
-    : '<p class="empty">No courses you can sign up for match these filters.</p>';
+    : '<p class="empty">No courses you can sign up for were found. Change the filters and press Search again.</p>';
   // Month headings stick just below the column headings.
   document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.getBoundingClientRect().height ?? 0) + 'px');
   for (const id of openNotes) {
@@ -765,6 +814,10 @@ function render() {
   }
 
   summary.innerHTML = `<b>${shown.length}</b> course${shown.length === 1 ? '' : 's'} you can sign up for`;
+  limit.textContent = truncated
+    ? 'Partial results. Narrow the filters and search again to check more courses.'
+    : shown.length === RESULT_LIMIT ? 'Showing the first 30 matches. Change the filters to find others.' : '';
+  limit.hidden = !limit.textContent;
 }
 
 // Notes: the location's comments, sanitized to a few harmless tags.
@@ -865,13 +918,12 @@ list.addEventListener('click', e => {
   if (btn) toggleNotes(btn.closest('.row'));
 });
 
-let timer;
-form.addEventListener('input', e => {
-  clearTimeout(timer);
-  timer = setTimeout(render, e.target.type === 'search' ? 200 : 0);
+form.addEventListener('input', updateSearchStatus);
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  searchSample();
 });
-form.addEventListener('submit', e => e.preventDefault());
-addEventListener('hashchange', () => { setFilters(fromFragment()); render(); });
+addEventListener('hashchange', () => { setFilters(fromFragment()); updateSearchStatus(); });
 
 // Keep the column header row just below the filter bar while scrolling.
 const measureHeaders = () => {
@@ -915,6 +967,7 @@ $('#types').innerHTML = FILTER_TYPES.map(([raw, short]) =>
 form.elements.lang.innerHTML = '<option value="">any</option>'
   + [...new Set(SAMPLE_COURSES.flatMap(c => c.langs))].sort().map(l => `<option>${esc(l)}</option>`).join('');
 setFilters(fromFragment());
+updateSearchStatus();
 render();
 </script>
 </body>
