@@ -105,3 +105,56 @@ test('the cursor uses the last raw date when a truncated query contains only dro
   assert.equal(requests.length, 11); assert.equal(requests[10].from, rows[99].course_start_date);
   assert.equal(result.reason, 'end'); assert.equal(result.count, 1); assert.equal(result.searchedThrough, rows[100].course_start_date);
 });
+
+// Listings of one course by two locations, like Dhamma Bhumi's copies of Dhamma Pāsāda's courses.
+const BHUMI = { id: 1494, name: 'Dhamma Bhumi', venue: 'Dhamma Pasada', venueUrl: 'https://maps.example/pasada' };
+const PASADA = { id: 1770, name: 'Dhamma Pāsāda', venue: 'Dhamma Pasada', venueUrl: 'https://maps.example/pasada' };
+const FORM = 'https://mycourses.dhamma.org/en/enrolment/initial_enrolment_form/';
+const listing = (id, loc, start = '2026-12-02', extra = {}) => ({ ...template, id, start, end: start, enroll: '2026-01-01', apply: '', comments: '',
+  status: [{ type: null, label: null, status: 'Open', color: 'Green' }], ...extra, loc: { ...template.loc, ...loc } });
+async function listed(pages, extra = {}) {
+  const events = [];
+  const result = await search(f, { today, emit: e => events.push(e), ...extra, getPage: async p => {
+    const number = Math.min(p.page, pages.length);
+    return { page: pageWithFacts({ courses: pages[number - 1], page: number, pages: pages.length, pages_truncated: false }), fetchedAt: '2026-11-14T00:00:00Z' };
+  } });
+  const progress = events.filter(e => e.type === 'progress');
+  return { result, progress, ids: progress.flatMap(e => e.courses.map(c => c.id)) };
+}
+test('a copy and the listing of the center holding it count as one course, in either order and across pages', async () => {
+  for (const page of [[listing(1, BHUMI), listing(2, PASADA)], [listing(2, PASADA), listing(1, BHUMI)]]) {
+    const r = await listed([page]); assert.deepEqual(r.ids, [2]); assert.equal(r.result.count, 1);
+  }
+  const fillers = Array.from({ length: 9 }, (_, i) => listing(10 + i, {}, '2026-12-01'));
+  const r = await listed([[...fillers, listing(1, BHUMI)], [listing(2, PASADA), listing(20, {}, '2026-12-03')]]);
+  assert.deepEqual(r.progress[0].courses.map(c => c.id), fillers.map(c => c.id));
+  assert.deepEqual(r.ids, [...fillers.map(c => c.id), 2, 20]); assert.equal(r.result.count, 11);
+});
+test('a copy without its center\'s listing appears once later dates are read, or when the search ends', async () => {
+  let r = await listed([[listing(1, BHUMI), listing(3, {}, '2026-12-03')]]);
+  assert.deepEqual(r.progress.map(e => e.courses.map(c => c.id)), [[1, 3]]);
+  r = await listed([[listing(1, BHUMI)]]);
+  assert.deepEqual(r.progress.map(e => e.courses.map(c => c.id)), [[], [1]]); assert.equal(r.result.count, 1); assert.equal(r.result.reason, 'end');
+  r = await listed([[listing(1, BHUMI), listing(2, PASADA), listing(3, {}, '2026-12-03'), listing(4, {}, '2026-12-04')]], { limit: 2 });
+  assert.deepEqual(r.ids, [2, 3]); assert.equal(r.result.reason, 'limit');
+});
+test('matching type and dates alone never merge listings', async () => {
+  const other = { ...BHUMI, id: 1342, name: 'Dhamma Rasmi' }, form = { apply: FORM + 'A' };
+  for (const pair of [
+    [listing(1, { ...BHUMI, venue: '' }), listing(2, { ...PASADA, venue: '' })],
+    [listing(1, BHUMI, undefined, { comments: '<p>Male students only</p>' }), listing(2, PASADA)],
+    [listing(1, BHUMI, undefined, { status: [{ type: null, label: null, status: 'Wait List', color: 'Yellow' }] }), listing(2, PASADA)],
+    [listing(1, BHUMI, undefined, { langs: ['Hindi'] }), listing(2, PASADA)],
+    [listing(1, BHUMI, undefined, form), listing(2, PASADA, undefined, { apply: FORM + 'B' })],
+    [listing(1, { ...BHUMI, venueUrl: 'https://maps.example/elsewhere' }), listing(2, PASADA)],
+    [listing(1, { ...BHUMI, venue: 'Dhamma Nilaya' }), listing(2, { ...other, venue: 'Dhamma Nilaya' })],
+    [listing(1, { ...BHUMI, venue: 'Moscow', venueUrl: '' }), listing(2, { ...other, venue: 'Moscow', venueUrl: '' })],
+  ]) assert.deepEqual((await listed([pair])).ids.sort(), [1, 2], JSON.stringify(pair.map(c => c.loc.venue)));
+});
+test('a shared enrollment form merges listings whatever their venues', async () => {
+  const form = { apply: FORM + 'Y3F1E2YbmHvAsIJ' };
+  let r = await listed([[listing(1, { id: 1615, name: 'Southwest Vipassana Group', venue: 'Hohritt' }, undefined, form), listing(2, { id: 2607, name: 'Dhamma Sampatti', venue: '' }, undefined, form)]]);
+  assert.deepEqual(r.ids, [1]);
+  r = await listed([[listing(1, { id: 1615, name: 'Southwest Vipassana Group', venue: 'Dhamma Sampatti' }, undefined, form), listing(2, { id: 2607, name: 'Dhamma Sampatti', venue: '' }, undefined, form)]]);
+  assert.deepEqual(r.ids, [2]);
+});

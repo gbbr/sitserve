@@ -113,8 +113,9 @@ and a simulator, identified by a small “simulated data” badge.
   The order is stored in localStorage as `sit.columns`; invalid saved orders fall back to the
   default. Both headings and rows use one column-to-HTML map and the same grid track order:
   1. **Location**:
-     - Shows a rectangular flag, then the name without its "Dhamma " prefix. Only non-centers have
-       a tiny faint blue dot; centers have no dot. The legend explains the non-center marker.
+     - Shows a rectangular flag, then the name without its "Dhamma " prefix. Courses away from a
+       center (at a non-center or an outside venue) have a tiny faint blue dot; others have none.
+       The legend explains the non-center marker.
      - Align the Location heading with the flag, at the left edge of the whole cell.
      - Flags are 16×12px local SVGs from the 4:3 set of `flag-icons` v7.3.2, with 2px corners and a fine edge.
        They use 78% opacity and 75% saturation to blend with the quiet rows; hovering restores

@@ -6,10 +6,21 @@ import { normalize, sanitize, photoPath, safeURL, hasNotes } from '../normalize.
 import { fixture, rawTemplate } from './helpers.js';
 import { PLACES, LOCATION_REGIONS, LOCATION_STATES, LANGUAGES, COURSE_TYPE_IDS } from '../../web/places.js';
 import { buildPlaces, inlineJSON } from '../../web/tools/build-places.js';
+import { venueCenters } from '../../web/shared/courses.js';
 test('normalization oracle: every original course and field', () => {
-  const expected = fixture('oracle-expected.json').map(c => ({ ...c, apply: safeURL(c.apply), comments: sanitize(c.comments), hasNotes: hasNotes(sanitize(c.comments)), loc: { ...c.loc, web: safeURL(c.loc.web), schedule: safeURL(c.loc.schedule), photo: photoPath(c.loc.photo) } }));
-  const actual = fixture('oracle-input.json').map(normalize);
+  const input = fixture('oracle-input.json');
+  // Dhamma Geha's own site is recorded as a venue, so its course 220827 is held at a center.
+  const expected = fixture('oracle-expected.json').map((c, i) => ({ ...c, apply: safeURL(c.apply), comments: sanitize(c.comments), hasNotes: hasNotes(sanitize(c.comments)), loc: { ...c.loc, center: c.loc.center || c.id === 220827, venueUrl: safeURL(input[i].location.sub_location_url), web: safeURL(c.loc.web), schedule: safeURL(c.loc.schedule), photo: photoPath(c.loc.photo) } }));
+  const actual = input.map(normalize);
   for (let i = 0; i < expected.length; i++) assert.deepEqual(actual[i], expected[i], `course ${expected[i].id}`); assert.equal(expected.length, 152);
+});
+test('a venue that names a directory center is a center; other venues keep the upstream flag', () => {
+  const at = (sub_location, sub_location_url = null) => normalize({ ...rawTemplate, location: { ...rawTemplate.location, center_noncenter: 'noncenter', sub_location, sub_location_url } }).loc;
+  for (const venue of ['Dhamma Pasada', 'Vipassana Long Course Centre (Dhamma Rasa)', 'Candeleda - Dhamma Sacca']) assert.equal(at(venue).center, true, venue);
+  for (const venue of ['Montreal', 'Vipassana Meditation France - Paris', 'Dhamma']) assert.equal(at(venue).center, false, venue);
+  assert.equal(at('Dhamma Pasada', 'https://maps.example/pasada').venueUrl, 'https://maps.example/pasada');
+  assert.equal(at('Dhamma Pasada', 'javascript:alert(1)').venueUrl, '');
+  assert.deepEqual(venueCenters('Dhamma Pasada'), [1770]); assert.deepEqual(venueCenters('Dhamma Nilaya, Jamdoli (Jaipur)'), [1399, 1848]);
 });
 test('out-of-scope courses dropped; unsafe URLs dropped', () => {
   assert.equal(normalize({ ...rawTemplate, raw_course_type: 'Other' }), null);

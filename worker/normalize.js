@@ -1,5 +1,5 @@
 import { rawPageFacts } from './dhamma.js';
-import { TYPE } from '../web/shared/courses.js';
+import { TYPE, venueCenters } from '../web/shared/courses.js';
 const BASE = 'https://www.dhamma.org';
 export const escapeHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export function safeURL(value, protocols = ['http:', 'https:']) {
@@ -63,8 +63,10 @@ export function normalize(c) {
     apply: safeURL(c.app_page_url || c.trans_apply_link_url || c.apply_link_url),
     loc: {
       id: l.id, subId: l.sub_location_id, name: l.dhamma_name.trim(), meaning: l.dhamma_name_meaning || '',
-      state: l.state || '', country: l.country || '', center: l.center_noncenter === 'center', cc: l.country_iso_code,
-      place: l.city_province_country, venue: l.sub_location || '', photo: photoPath(l.sub_loc_image || l.header_image_path),
+      // dhamma.org reports every course at a venue as non-center; a venue that names a center is one.
+      state: l.state || '', country: l.country || '', center: l.center_noncenter === 'center' || venueCenters(l.sub_location).length > 0,
+      cc: l.country_iso_code, place: l.city_province_country, venue: l.sub_location || '', venueUrl: safeURL(l.sub_location_url),
+      photo: photoPath(l.sub_loc_image || l.header_image_path),
       web: safeURL(l.website_url), schedule: safeURL(l.schedule_url),
     },
   };

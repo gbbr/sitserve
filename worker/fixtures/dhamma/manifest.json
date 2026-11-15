@@ -1,6 +1,6 @@
 {
   "snapshot": "2026-11-14",
-  "notes": "daterange is null where not recorded. Corpus deduplicates all saved do_search pages by id; later captures win. Only course_type_hint, instruction_languages_tooltip and location.contact/about/instructions are dropped. Oracle input uses original 2026-11-13 source order. Oracle differences: sanitized comments, safe canonical URLs (including trailing slashes), same-origin photos, hasNotes. Search location 1699 has no directory pin and is treated as non-center. Metadata hashes verify equality with the original snapshot.",
+  "notes": "daterange is null where not recorded. Corpus deduplicates all saved do_search pages by id; later captures win. Only course_type_hint, instruction_languages_tooltip and location.contact/about/instructions are dropped. Oracle input uses original 2026-11-13 source order. Oracle differences: sanitized comments, safe canonical URLs (including trailing slashes), same-origin photos, hasNotes, venue URLs, and centers at venues that name a directory center (course 220827). Search location 1699 has no directory pin and is treated as non-center. Metadata hashes verify equality with the original snapshot.",
   "probeFacts": "probe-facts.json records paging, accepted filters, ids and hashes for every 2026-11-14 probe. Page size probes return the same IDs and paging as base.",
   "verbatimBytes": 733533,
   "corpusCourses": 283,

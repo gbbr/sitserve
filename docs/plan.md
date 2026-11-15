@@ -41,6 +41,14 @@ The page keeps streamed rows, shows incomplete results or errors, and requires S
   NM/NF sends only IDs 3 and 1, or makes zero requests when Course excludes both.
 - Read ten-course pages in date order; deduplicate IDs and apply As, centers, wait lists,
   not-open-yet and Language again before counting. Stop at **50 matches**.
+- A course is at a center when dhamma.org says so or its venue names a directory center. Copies
+  of one course listed by different locations count once
+  ([dhamma-api.md](dhamma-api.md#venues-and-copied-listings)): they must match in every course
+  field except ID and application link, and either share a mycourses form or, while one has no
+  form, be held at the same center (the listing location, or the one directory center the venue
+  names) without conflicting venue URLs. Different forms never merge. A copy held at another
+  location's center waits until that center's listing replaces it or a later start date shows
+  none will come.
 - At a truncated query's tenth page, query again from its last raw start date. Raw row counts,
   date bounds and IDs drive paging, same-date and nothing-new stops, even when every course on
   a page is dropped. Unusable raw dates are excluded from the bounds. Read at most **20 pages**,
@@ -56,7 +64,7 @@ Normalized pages and paging metadata are persisted in DO storage, with an in-mem
 They remain valid for **24 hours**, including across full dev-server and production restarts.
 Keys include a schema version, mode, normalized type/region lists, language, date range and page;
 As/availability/display filters reuse the same pages. Simulator scenarios and shifted snapshots
-have separate namespaces. Schema version 2 retains `rawCount`, `rawFirstStart`, `rawLastStart`
+have separate namespaces. Schema version 3 retains `rawCount`, `rawFirstStart`, `rawLastStart`
 and `rawIds` alongside normalized courses.
 
 Writes use `getAlarm` to schedule only a missing or earlier expiry alarm; they do not scan storage.
@@ -146,9 +154,9 @@ node scripts/import-fixtures.js /path/to/dhamma-saved
 The place generator reproduces the original 1,170 places, tags, counts and region memberships.
 Search location 1699 has no directory pin and defaults to non-center. The fixture importer uses
 the preserved oracle; an optional original snapshot JS argument verifies the original metadata
-and extracts the oracle. Safe URL canonicalization, sanitized comments, proxied photos and
-`hasNotes` are the intentional normalization differences. Countries without a saved flag use a
-text fallback; no flag or photo is downloaded during development.
+and extracts the oracle. Safe URL canonicalization, sanitized comments, proxied photos, `hasNotes`,
+venue URLs and centers at venues that name one are the intentional normalization differences.
+Countries without a saved flag use a text fallback; no flag or photo is downloaded during development.
 
 ## Deployment and tuning remain
 

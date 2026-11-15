@@ -46,6 +46,22 @@ export const places = PLACES.map(([kind, id, text, texts, tag, count]) => ({
   kind, id, text, texts, tag, count, key: `${kind}_${id}`, search: [...texts, text].map(fold),
 }));
 export const placeByKey = new Map(places.map(p => [p.key, p]));
+// Names compared without accents, case or punctuation: "Dhamma Pasada" matches "Dhamma Pāsāda".
+export const nameKey = s => fold(s).replace(/[^a-z0-9]+/g, ' ').trim();
+const centerIDs = new Map();
+for (const p of places) if (p.kind === 'location' && p.tag === 'center') {
+  const key = nameKey(p.texts[0]);
+  centerIDs.set(key, [...centerIDs.get(key) || [], p.id]);
+}
+// Directory centers a venue name refers to: the whole name, or a "Dhamma …" center name inside it,
+// as in "Vipassana Long Course Centre (Dhamma Rasa)". Two pairs of centers share a name. Other
+// center names, such as "Vipassana Meditation France", are too generic to find inside a longer one.
+export function venueCenters(venue) {
+  const key = nameKey(venue);
+  if (!key) return [];
+  if (centerIDs.has(key)) return centerIDs.get(key);
+  return [...centerIDs].filter(([name]) => name.startsWith('dhamma') && ` ${key} `.includes(` ${name} `)).flatMap(([, ids]) => ids);
+}
 export const languageNames = new Map(LANGUAGES);
 export function placeMatches(c, p) {
   const l = c.loc;

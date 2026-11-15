@@ -6,7 +6,7 @@ import { QueryIndex, queryParams } from './query-cache.js';
 import { search, serverToday } from './search.js';
 const HOUR = 3600000, DAY = 24 * HOUR;
 const BREAKS = new Set(['429', '5xx', 'non-json', 'malformed', 'slow', 'timeout', 'network']);
-export const CACHE_SCHEMA = 2;
+export const CACHE_SCHEMA = 3;
 export async function cacheKey(kind, params, namespace = 'simulator') {
   const bytes = new TextEncoder().encode(JSON.stringify([CACHE_SCHEMA, namespace, kind, params]));
   return `${kind}:` + [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');

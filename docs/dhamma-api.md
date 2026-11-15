@@ -101,11 +101,33 @@ Useful course fields:
 | `status` | `[{"status": "Wait List", "color": "Yellow", "label": "Women", "type": "w"}]` | One entry per applicant group. `type`: `m`/`w` men/women, `nm`/`nw` new students, `om`/`ow` old students, `ms`/`fs`/`s` servers, `null` the whole course. Seen statuses: `Open`, `Wait List`, `Closed`, `Course Full`, `In Progress`. |
 | `service` | `false` | `true` seen on `ServicePeriod`, `OSProgram` and some `Other` entries. |
 | `apply_link_url` | `"/portal/student_apps/new_app?course_id=…&location_id=…"` | Site-relative. |
-| `app_page_url` | `"https://schedule.vridhamma.org/form/…"` | External application form (Indian centers); empty otherwise. |
+| `app_page_url` | `"https://schedule.vridhamma.org/form/…"` | External application form: `schedule.vridhamma.org` for Indian centers, or a `mycourses.dhamma.org/…/initial_enrolment_form/<token>` form that identifies the course. Empty otherwise, including for some courses whose enrollment opens months later. |
 | `comments` | HTML | Notes from the location. |
-| `location` | object | Same fields as the [location API](#location-details-get-enapiv1locationsidjson), plus `sub_location` and `sub_location_id` naming the venue when the location has several. `header_image_path` is the site-relative photo: `/system/images/centers/<name>.jpg`, or a default image under `/assets/`. |
+| `location` | object | Same fields as the [location API](#location-details-get-enapiv1locationsidjson), plus `sub_location`, `sub_location_id` and `sub_location_url` (a free-form link) naming the course's venue when the location records one. `center_noncenter` and `pin_class` then describe the venue; see [Venues and copied listings](#venues-and-copied-listings). `header_image_path` is the site-relative photo: `/system/images/centers/<name>.jpg`, or a default image under `/assets/`. |
 
 `location.haversine_distance` is always `null`, and no distance parameter is known.
+
+### Venues and copied listings
+
+Verified 2026-11-15 on all 283 saved courses, 156 live results and three schedule pages.
+
+- A course at a venue (`sub_location`) always reports `center_noncenter: "noncenter"` and
+  `pin_class: "pin-noncenter"`, even when the venue is a center. Without a venue, both match the
+  location's directory pin. Most venues are outside sites, such as Dhamma Suttama's Montreal
+  courses, but some are centers: Dhamma Geha records its own site as the venue
+  "Dhamma Geha Vipassana Meditation Centre, Bangli".
+- Some locations list another location's courses as records of their own. Dhamma Bhumi's schedule
+  lists all 36 of Dhamma Pāsāda's courses at Bhumi's venue "Dhamma Pasada" (sub-location 2238).
+  Pāsāda lists the same courses at its own venue 2239, which has the same name and URL. Each copy
+  has its own course ID and application link (`course_id` and `location_id`), but the same type,
+  label, dates, enrollment date, languages, status and comments. On the schedule pages, all 11
+  courses with open enrollment used the same mycourses form in both listings. Search returns both records, such as
+  20-day courses 234197 (Bhumi) and 234198 (Pāsāda). Southwest Vipassana Group lists Dhamma
+  Sampatti's courses the same way, and the two listings share one form.
+- Sub-location IDs belong to the listing location, so they never match across copies.
+- Combined schedule pages such as `/en/schedules/noncenter/uk` display other locations' own
+  records (here Dhamma Dipa's and Dhamma Sukhakāri's). Search returns those once, under the
+  location that holds the course.
 
 ### Course type IDs
 
@@ -183,9 +205,11 @@ center/non-center pins, and the search page for selectable places.
 `/en/schedules/sch<subdomain>` for centers, `/en/schedules/noncenter/<subdomain>` for non-centers.
 All share one template: tables under `sch-header-year` headings, with rows
 `<tr class="sch-row-N <raw_course_type>">` and columns for apply, dates, type, status, location
-and comments. Date formats vary (`10 Nov - 21 Nov` with the year in the heading, or
-`December 22, 2026`). sitserve does not use schedule HTML; the search endpoint has the same information as
-structured data.
+and comments. The location column links to the venue's `sub_location_url`, otherwise to the
+listing location's map entry (`/en/maps#<subdomain>`). Apply links on the Australian and UK pages
+are the mycourses forms from `app_page_url`. Date formats vary (`10 Nov - 21 Nov` with the year
+in the heading, or `December 22, 2026`). sitserve does not use schedule HTML; the search endpoint
+has the same information as structured data.
 
 ## Implications for sitserve
 
@@ -195,6 +219,8 @@ structured data.
   several `regions[]=location_<id>`.
 - The site's applicant filters are attend/serve and gender, and neither considers availability.
   sitserve's As filter (new / old / server × male / female) checks that position's status itself.
+- sitserve counts a course as held at a center when the upstream flag says so or its venue names a
+  directory center, and shows copied listings once (see [plan.md](plan.md#search-and-stream)).
 
 ## Local implementation
 
