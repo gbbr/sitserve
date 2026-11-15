@@ -9,8 +9,10 @@ dhamma.org's own behavior in [dhamma-api.md](dhamma-api.md).
 
 Workers Static Assets serves `web/` except `tools/`. `/api/*` and `/photo/*` run through the
 Worker first. One SQLite-backed Durable Object (DO), named `upstream`, runs searches, shares the
-cache and makes every upstream request. In simulator mode, `GET /api/debug` reports simulator
-request and active search counts for tests.
+cache and makes every upstream request. `worker/index.js` is the production entry point;
+`worker/dev.js` re-exports the Worker and injects the simulator into its DO for development and
+tests. The production module graph excludes the simulator and its corpus. In simulator mode,
+`GET /api/debug` reports simulator request and active search counts for tests.
 
 Cancellation is scoped to the visitor IP and search ID. The page sends its own
 `X-Sitserve-Search-Id` UUID, so it can cancel before the start event arrives. The Worker forwards
@@ -103,7 +105,10 @@ course index or cache warming.
 `GET /photo/system/images/...` and `/photo/assets/...` accept image paths only. Live photos use
 the same queue, identity and breaker, are stored for seven days and get a one-day browser cache
 lifetime. A photo answering 404/410 or larger than 2 MB is stored as missing for a day and returns
-404, without pausing the gate. Simulator photos are generated SVG placeholders.
+404, without pausing the gate. Photo metadata uses `photo:` keys; image bodies use separate
+`chunk:photo:` keys so expiry scans exclude those bodies. Existing chunks under `photo:` remain
+readable and are deleted when their photo expires or is absent. Simulator photos are generated
+SVG placeholders.
 
 ## Audience
 

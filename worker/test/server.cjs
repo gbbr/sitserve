@@ -9,7 +9,7 @@ async function startServer({ persistTo, vars = {} } = {}) {
   let worker;
   try {
     worker = await unstable_startWorker({
-      config: 'wrangler.jsonc', entrypoint: 'worker/index.js',
+      config: 'wrangler.jsonc', entrypoint: 'worker/dev.js',
       bindings: Object.fromEntries(Object.entries(values).map(([k,value]) => [k,{type:'plain_text',value}])),
       dev: { remote: false, persist: dir, server: { hostname: '127.0.0.1', port: 0 }, inspector: false, logLevel: 'error',
         outboundService: request => globalThis.fetch(request.url, {

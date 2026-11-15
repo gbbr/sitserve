@@ -29,6 +29,7 @@ export function sameCourse(a, b) {
 }
 export async function search(filters, { getPage, getCachedSequence = async () => null, emit = () => {}, signal, today = utcToday(), cap = 20, limit = RESULT_LIMIT }) {
   const f = clampFilters(filters, today), seen = new Set(), seenRaw = new Set();
+  const params = requestParams(f, { today });
   // Matching courses already sent, and copies held while the listing of the center holding them can still arrive.
   const sent = [], held = [];
   let count = 0, pages = 0, checkedAt = null, searchedThrough = null, from = f.from, reason = 'end';
@@ -49,37 +50,40 @@ export async function search(filters, { getPage, getCachedSequence = async () =>
   const release = (added, before) => {
     for (const c of held.filter(c => !before || c.start < before)) { held.splice(held.indexOf(c), 1); added.push(c); }
   };
+  const usePage = ({ page, fetchedAt, cacheHit }, extra = {}, before = null) => {
+    pages++;
+    if (!checkedAt || fetchedAt < checkedAt) checkedAt = fetchedAt;
+    if (page.rawLastStart && (!searchedThrough || page.rawLastStart > searchedThrough)) searchedThrough = page.rawLastStart;
+    const added = [];
+    for (const c of page.courses) {
+      if ((before && c.start >= before) || seen.has(c.id)) continue;
+      seen.add(c.id);
+      take(c, added);
+      if (count === limit) break;
+    }
+    if (page.rawLastStart) release(added, page.rawLastStart);
+    progress(added, { cacheHit: !!cacheHit, ...extra });
+    return count === limit;
+  };
   const flush = () => { if (held.length) { const added = []; release(added); progress(added); } };
   const finish = reason => {
     if (reason !== 'cancelled') flush();
     const result = done(reason); emit(result); return result;
   };
-  if (!requestParams(f, { today }).types.length) return finish('end');
+  if (!params.types.length) return finish('end');
   if (signal?.aborted) return finish('cancelled');
   let reused;
-  try { reused = await getCachedSequence(requestParams(f, { today })); }
+  try { reused = await getCachedSequence(params); }
   catch (e) {
     if (!signal?.aborted && e.code !== 'cancelled') throw e;
     return finish('cancelled');
   }
   if (signal?.aborted) return finish('cancelled');
   if (reused) {
-    for (const { page, fetchedAt } of reused.pages) {
+    for (const result of reused.pages) {
       if (signal?.aborted) return finish('cancelled');
       if (pages >= cap) return finish('cap');
-      pages++;
-      if (!checkedAt || fetchedAt < checkedAt) checkedAt = fetchedAt;
-      if (page.rawLastStart && (!searchedThrough || page.rawLastStart > searchedThrough)) searchedThrough = page.rawLastStart;
-      const added = [];
-      for (const c of page.courses) {
-        if ((!reused.complete && c.start >= reused.coverageEnd) || seen.has(c.id)) continue;
-        seen.add(c.id);
-        take(c, added);
-        if (count === limit) break;
-      }
-      if (page.rawLastStart) release(added, page.rawLastStart);
-      progress(added, { cacheHit: true, reused: true });
-      if (count === limit) return finish('limit');
+      if (usePage(result, { cacheHit: true, reused: true }, reused.complete ? null : reused.coverageEnd)) return finish('limit');
     }
     if (reused.complete) return finish('end');
     from = reused.coverageEnd;
@@ -91,7 +95,7 @@ export async function search(filters, { getPage, getCachedSequence = async () =>
     for (let number = 1; number <= 10 && pages < cap; number++) {
       if (signal?.aborted) { reason = 'cancelled'; break outer; }
       let result;
-      try { result = await getPage(requestParams(f, { today, page: number, from })); }
+      try { result = await getPage({ ...params, from, page: number }); }
       catch (e) {
         if (signal?.aborted || e.code === 'cancelled') reason = 'cancelled';
         else if (['allowance', 'paused', 'visitor-limit'].includes(e.code)) { reason = e.code; flush(); emit({ type: 'error', code: e.code, message: e.message, retryAfter: e.retryAfter || 0 }); }
@@ -99,31 +103,17 @@ export async function search(filters, { getPage, getCachedSequence = async () =>
         break outer;
       }
       if (signal?.aborted) { reason = 'cancelled'; break outer; }
-      const { page, fetchedAt } = result;
-      pages++;
-      if (!checkedAt || fetchedAt < checkedAt) checkedAt = fetchedAt;
+      const { page } = result;
       const { rawCount, rawFirstStart, rawLastStart, rawIds } = page;
       querySize += rawCount;
       queryFirst ||= rawFirstStart;
-      if (rawLastStart) {
-        queryLast = rawLastStart;
-        if (!searchedThrough || rawLastStart > searchedThrough) searchedThrough = rawLastStart;
-      }
+      if (rawLastStart) queryLast = rawLastStart;
       for (const id of rawIds) {
         if (!seenRaw.has(id)) { seenRaw.add(id); queryNew = true; }
       }
       // Rows without usable IDs can still establish progress through later dates.
       if (rawIds.length < rawCount && rawLastStart && (!previousThrough || rawLastStart > previousThrough)) queryNew = true;
-      const added = [];
-      for (const c of page.courses) {
-        if (seen.has(c.id)) continue;
-        seen.add(c.id);
-        take(c, added);
-        if (count === limit) break;
-      }
-      if (rawLastStart) release(added, rawLastStart);
-      progress(added, { cacheHit: !!result.cacheHit });
-      if (count === limit) { reason = 'limit'; break outer; }
+      if (usePage(result)) { reason = 'limit'; break outer; }
       if (!rawCount || page.page < number) { reason = from !== f.from && !queryNew ? 'nothing-new' : 'end'; break outer; }
       if (number >= page.pages) {
         if (from !== f.from && !queryNew) { reason = 'nothing-new'; break outer; }

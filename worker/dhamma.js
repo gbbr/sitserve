@@ -8,11 +8,14 @@ export function requestParams(filters, { today = utcToday(), page = 1, from = fi
   return { types: searchTypeIDs(filters), regions: filters.where ? [...filters.where.split(',')].sort() : [],
     language: filters.lang, from, end: `${+today.slice(0, 4) + 2}-12-31`, page };
 }
-export function buildRequest(params, env = {}) {
-  if (!params.types.length) return null;
+export function upstreamUserAgent(env = {}) {
   if (env.UPSTREAM === 'live' && !env.UPSTREAM_CONTACT?.trim())
     throw new UpstreamError('configuration', 'Live mode requires UPSTREAM_CONTACT. Set it in .dev.vars or a secret.');
-  const body = new URLSearchParams();
+  return `sitserve/${VERSION} (+${env.SITE_URL || 'http://localhost:8787'}; ${env.UPSTREAM_CONTACT || 'local simulator'})`;
+}
+export function buildRequest(params, env = {}) {
+  if (!params.types.length) return null;
+  const identity = upstreamUserAgent(env), body = new URLSearchParams();
   body.append('current_state', 'OldStudents');
   for (const id of params.types) body.append('course_type_constraint[]', String(id));
   for (const region of params.regions) body.append('regions[]', region);
@@ -23,7 +26,7 @@ export function buildRequest(params, env = {}) {
   return new Request(SEARCH_URL, { method: 'POST', redirect: 'manual', headers: {
     Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest',
     'Content-Type': 'application/x-www-form-urlencoded',
-    'User-Agent': `sitserve/${VERSION} (+${env.SITE_URL || 'http://localhost:8787'}; ${env.UPSTREAM_CONTACT || 'local simulator'})`,
+    'User-Agent': identity,
   }, body });
 }
 export function retryAfter(value, now = Date.now()) {

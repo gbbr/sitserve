@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sitserve",
-  "main": "worker/index.js",
+  "main": "worker/dev.js",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["enable_request_signal", "request_signal_passthrough"],
   // Cloudflare Access guards only the custom domain; no workers.dev or preview URL may bypass it.
@@ -23,6 +23,7 @@
   },
   "env": {
     "production": {
+      "main": "worker/index.js",
       "routes": [{ "pattern": "os.sutamaya.org", "custom_domain": true }],
       "vars": { "UPSTREAM": "live", "SITE_URL": "https://os.sutamaya.org", "UPSTREAM_SPACING_MS": "1500" },
       "durable_objects": { "bindings": [{ "name": "UPSTREAM_GATE", "class_name": "UpstreamDurableObject" }] }

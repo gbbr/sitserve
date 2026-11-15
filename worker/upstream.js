@@ -1,6 +1,5 @@
-import { buildRequest, getDhammaPage, readResponse, timedRequest, UpstreamError } from './dhamma.js';
+import { getDhammaPage, readResponse, timedRequest, upstreamUserAgent, UpstreamError } from './dhamma.js';
 import { normalizePage, validPhotoPath } from './normalize.js';
-import { createSimulator } from './simulator.js';
 import { escapeHTML, parseFilters } from '../web/shared/courses.js';
 import { QueryIndex, queryParams } from './query-cache.js';
 import { search, serverToday } from './search.js';
@@ -32,6 +31,10 @@ export class UpstreamGate {
       if (!this.meta.visitors[ip].length) delete this.meta.visitors[ip];
     }
   }
+  secondsUntil(time) { return Math.max(1, Math.ceil((time - this.clock()) / 1000)); }
+  pruneCancelledSearches() {
+    for (const [key, at] of this.cancelledSearches) if (at <= this.clock()) this.cancelledSearches.delete(key);
+  }
   async save() { await this.storage.put('meta', this.meta); }
   // Upstream requests started on the current UTC day, by bucket; the page footer shows them.
   usage() {
@@ -42,13 +45,13 @@ export class UpstreamGate {
   beginSearch(ip, id) {
     this.active.get(ip)?.controller.abort();
     const session = { ip, id, controller: new AbortController(), charged: false };
-    for (const [key, at] of this.cancelledSearches) if (at <= this.clock()) this.cancelledSearches.delete(key);
+    this.pruneCancelledSearches();
     if (id && this.cancelledSearches.has(`${ip}:${id}`)) session.controller.abort();
     this.active.set(ip, session); return session;
   }
   cancelSearch(id, ip) {
     if (!id) return;
-    for (const [key, at] of this.cancelledSearches) if (at <= this.clock()) this.cancelledSearches.delete(key);
+    this.pruneCancelledSearches();
     this.cancelledSearches.set(`${ip}:${id}`, this.clock() + 60000);
     if (this.cancelledSearches.size > 1000) this.cancelledSearches.delete(this.cancelledSearches.keys().next().value);
     for (const s of this.active.values()) if (s.id === id && s.ip === ip) s.controller.abort();
@@ -70,7 +73,7 @@ export class UpstreamGate {
   async remove(key, value) {
     this.memory.delete(key); await this.storage.delete(key);
     if (key.startsWith('page:')) await this.queries.remove(key);
-    if (value?.chunks) await this.storage.delete(Array.from({ length: value.chunks }, (_, i) => `${key}:${i}`));
+    if (value?.chunks) await this.storage.delete(Array.from({ length: value.chunks }, (_, i) => [`chunk:${key}:${i}`, `${key}:${i}`]).flat());
   }
   async expire() {
     let next = Infinity;
@@ -79,7 +82,10 @@ export class UpstreamGate {
       while (true) {
         const values = await this.storage.list({ prefix, limit: 64, ...(startAfter ? { startAfter } : {}) });
         for (const [key, value] of values) {
-          if (value?.expiresAt <= this.clock()) await this.remove(key, value);
+          if (prefix === 'photo:' && /^photo:[^:]+:\d+$/.test(key)) {
+            const photo = await this.storage.get(key.slice(0, key.lastIndexOf(':')));
+            if (!photo || photo.expiresAt <= this.clock()) await this.storage.delete(key);
+          } else if (value?.expiresAt <= this.clock()) await this.remove(key, value);
           else if (value?.expiresAt) next = Math.min(next, value.expiresAt);
         }
         if (values.size < 64) break;
@@ -105,17 +111,21 @@ export class UpstreamGate {
     this.log(JSON.stringify({ event: 'upstream-slow', elapsedMs, at: new Date(this.clock()).toISOString() }));
     await this.pause();
   }
+  requestOptions() {
+    return { fetch: this.fetch, clock: this.clock, timers: this.timers, timeout: +(this.env.UPSTREAM_TIMEOUT_MS || 20000),
+      slow: +(this.env.UPSTREAM_SLOW_MS || 10000), onSlow: elapsed => this.slowResponse(elapsed) };
+  }
   async charge(session) {
     if (!session || session.charged) return;
     this.cancelled(session); this.prune();
     const times = this.meta.visitors[session.ip] || [];
     if (times.length >= +(this.env.VISITOR_SEARCHES_PER_MINUTE || 3))
-      throw new UpstreamError('visitor-limit', 'Too many uncached searches. Wait a minute, then press Search.', Math.max(1, Math.ceil((times[0] + 60000 - this.clock()) / 1000)));
+      throw new UpstreamError('visitor-limit', 'Too many uncached searches. Wait a minute, then press Search.', this.secondsUntil(times[0] + 60000));
     times.push(this.clock()); this.meta.visitors[session.ip] = times; session.charged = true; await this.save();
   }
   async getPage(params, session) {
     await this.ready; this.cancelled(session);
-    const normalized = { ...params, types: [...params.types].sort((a, b) => a - b), regions: [...params.regions].sort() };
+    const normalized = { ...queryParams(params), page: params.page };
     const key = await cacheKey('page', normalized, this.namespace), hit = await this.cached(key);
     this.cancelled(session);
     if (hit) {
@@ -125,9 +135,7 @@ export class UpstreamGate {
     }
     await this.charge(session);
     return this.enqueue(key, session, 'requests', async () => {
-      const page = normalizePage(await getDhammaPage(params, { env: this.env, fetch: this.fetch, clock: this.clock, timers: this.timers,
-        timeout: +(this.env.UPSTREAM_TIMEOUT_MS || 20000), slow: +(this.env.UPSTREAM_SLOW_MS || 10000),
-        log: this.log, onSlow: elapsed => this.slowResponse(elapsed) }));
+      const page = normalizePage(await getDhammaPage(params, { ...this.requestOptions(), env: this.env, log: this.log }));
       const fetchedAt = new Date(this.clock()).toISOString();
       const entry = { page, fetchedAt, expiresAt: this.clock() + DAY };
       await this.put(key, entry);
@@ -185,9 +193,9 @@ export class UpstreamGate {
           this.prune();
           if (this.meta.pausedUntil > this.clock()) throw new UpstreamError('paused', 'Upstream searches are paused. Try Search again later.', Math.ceil((this.meta.pausedUntil - this.clock()) / 1000));
           const times = this.meta[job.bucket], limit = +(job.bucket === 'photos' ? this.env.PHOTO_ALLOWANCE || 60 : this.env.UPSTREAM_ALLOWANCE || 100);
-          if (times.length >= limit) throw new UpstreamError('allowance', 'The hourly upstream allowance is spent. Cached pages are still available.', Math.max(1, Math.ceil((times[0] + HOUR - this.clock()) / 1000)));
+          if (times.length >= limit) throw new UpstreamError('allowance', 'The hourly upstream allowance is spent. Cached pages are still available.', this.secondsUntil(times[0] + HOUR));
           // Configuration failures must not consume the allowance.
-          if (this.env.UPSTREAM === 'live') buildRequest({ types: [3], regions: [], language: '', from: '2000-01-01', end: '2000-12-31', page: 1 }, this.env);
+          upstreamUserAgent(this.env);
           this.meta.lastStarted = this.clock(); times.push(this.clock()); this.usage()[job.bucket]++; await this.save();
           this.log(JSON.stringify({ event: 'upstream', mode: this.env.UPSTREAM || 'simulator', bucket: job.bucket, requestsInHour: times.length, at: new Date(this.clock()).toISOString() }));
           const value = await job.run();
@@ -210,17 +218,15 @@ export class UpstreamGate {
     const missing = () => new UpstreamError('missing', 'Photo not found.');
     const read = async hit => {
       if (hit.missing) throw missing();
-      const chunks = await Promise.all(Array.from({ length: hit.chunks }, (_, i) => this.storage.get(`${key}:${i}`)));
+      const chunks = await Promise.all(Array.from({ length: hit.chunks }, async (_, i) => await this.storage.get(`chunk:${key}:${i}`) || this.storage.get(`${key}:${i}`)));
       const body = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
       let offset = 0; for (const c of chunks) { body.set(new Uint8Array(c), offset); offset += c.byteLength; }
       return { body, type: hit.type };
     };
     const hit = await this.cached(key); if (hit) return read(hit);
     return this.enqueue(key, null, 'photos', async () => {
-      const identity = buildRequest({ types: [3], regions: [], language: '', from: '', end: '', page: 1 }, this.env).headers.get('User-Agent');
-      const value = await timedRequest(new Request('https://www.dhamma.org' + path, { redirect: 'manual', headers: { 'User-Agent': identity, Accept: 'image/*' } }), {
-        fetch: this.fetch, clock: this.clock, timers: this.timers, timeout: +(this.env.UPSTREAM_TIMEOUT_MS || 20000), slow: +(this.env.UPSTREAM_SLOW_MS || 10000),
-        onSlow: elapsed => this.slowResponse(elapsed),
+      const value = await timedRequest(new Request('https://www.dhamma.org' + path, { redirect: 'manual', headers: { 'User-Agent': upstreamUserAgent(this.env), Accept: 'image/*' } }), {
+        ...this.requestOptions(),
         // A photo that is gone or too large is one photo's problem: it is remembered as missing
         // for a day and does not pause the gate. Other unsuccessful statuses reject with their breaker code.
         decode: async r => {
@@ -234,7 +240,7 @@ export class UpstreamGate {
       });
       if (!value) { await this.put(key, { missing: true, expiresAt: this.clock() + DAY }); throw missing(); }
       const chunks = Math.ceil(value.body.byteLength / 65536);
-      for (let i = 0; i < chunks; i++) await this.storage.put(`${key}:${i}`, value.body.slice(i * 65536, (i + 1) * 65536));
+      for (let i = 0; i < chunks; i++) await this.storage.put(`chunk:${key}:${i}`, value.body.slice(i * 65536, (i + 1) * 65536));
       await this.put(key, { chunks, type: value.type, expiresAt: this.clock() + 7 * DAY });
       return value;
     });
@@ -242,7 +248,9 @@ export class UpstreamGate {
 }
 
 export class UpstreamDurableObject {
-  constructor(ctx, env) {
+  constructor(ctx, env, createSimulator) {
+    if (env.UPSTREAM !== 'live' && !createSimulator)
+      throw new UpstreamError('configuration', 'Simulator mode requires a simulator factory. Use worker/dev.js.');
     this.ctx = ctx; this.env = env;
     this.simulator = env.UPSTREAM === 'live' ? null : createSimulator({ env });
     this.gate = new UpstreamGate({ storage: ctx.storage, env, fetch: this.simulator ? this.simulator.fetch : globalThis.fetch.bind(globalThis) });
