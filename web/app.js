@@ -491,7 +491,8 @@ async function searchCourses() {
     let buffer = '', finished = false;
     const event = data => {
       if (searchResult !== result || active.signal.aborted) return;
-      if (data.type === 'start') { result.today = data.today; $('#mode').hidden = data.mode !== 'simulator'; }
+      if (data.type === 'start') { result.today = data.today; result.mode = data.mode; $('#mode').hidden = data.mode !== 'simulator'; }
+      if (data.usage) showUsage(data.usage, result.mode);
       if (data.type === 'progress') {
         for (const c of data.courses) if (!byId.has(c.id)) { byId.set(c.id, c); result.shown.push([c, availability(c, f, result.today)]); }
         result.shown.sort(([a], [b]) => a.start.localeCompare(b.start) || a.loc.name.localeCompare(b.loc.name));
@@ -527,6 +528,11 @@ async function searchCourses() {
     }
     if (controller === active) controller = null;
   }
+}
+// Requests the backend started today (UTC), across all visitors; cache hits are not counted.
+function showUsage({ requests, photos }, mode) {
+  const n = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+  $('#usage').textContent = `${mode === 'simulator' ? 'Simulated requests' : 'Requests to dhamma.org'} today (UTC): ${n(requests, 'page')}, ${n(photos, 'photo')}`;
 }
 $('#cancel').addEventListener('click', () => controller?.abort());
 addEventListener('pagehide', () => controller?.abort());
@@ -621,8 +627,14 @@ function toggleNotes(row, open) {
   row.after(notes);
 }
 
-// Photo popover for location names.
-let photoFor = null;
+// Photo popover for location names. The photo loads only after the pointer rests on a name,
+// so moving across the list doesn't request every photo it passes.
+const PHOTO_DELAY = 150;
+let photoFor = null, photoPending = null, photoTimer = 0;
+function schedulePhoto(name) {
+  clearTimeout(photoTimer); photoPending = name;
+  photoTimer = setTimeout(() => { photoPending = null; if (name.isConnected) showPhoto(name); }, PHOTO_DELAY);
+}
 function showPhoto(name) {
   const c = byId.get(+name.closest('.row').dataset.id);
   const img = new Image(284, 200);
@@ -638,6 +650,7 @@ function showPhoto(name) {
   photoFor = name;
 }
 function hidePhoto() {
+  clearTimeout(photoTimer); photoPending = null;
   photo.hidden = true;
   photoFor = null;
 }
@@ -659,12 +672,13 @@ function hideTip() {
 
 document.addEventListener('mouseover', e => {
   const name = e.target.closest('.name[data-photo]');
-  if (name && name !== photoFor) showPhoto(name);
+  if (name && name !== photoFor && name !== photoPending) schedulePhoto(name);
   const el = e.target.closest('[data-tip]');
   if (el && el !== tipFor) showTip(el);
 });
 document.addEventListener('mouseout', e => {
-  if (photoFor && !photoFor.contains(e.relatedTarget)) hidePhoto();
+  const current = photoFor || photoPending;
+  if (current && !current.contains(e.relatedTarget)) hidePhoto();
   if (tipFor && !tipFor.contains(e.relatedTarget)) hideTip();
 });
 addEventListener('scroll', () => { hidePhoto(); hideTip(); }, { passive: true });

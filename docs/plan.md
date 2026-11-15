@@ -25,7 +25,7 @@ Responses are NDJSON with `Cache-Control: no-store`:
 ```json
 {"type":"start","mode":"simulator","searchId":"<UUID>","today":"2026-11-14","filters":{}}
 {"type":"progress","courses":[],"searchedThrough":"2026-12-03","checkedAt":"2026-11-14T12:00:00.000Z","pages":4,"cacheHit":true}
-{"type":"done","reason":"end","partial":false,"searchedThrough":"2026-12-03","checkedAt":"2026-11-14T12:00:00.000Z","pages":4,"count":18}
+{"type":"done","reason":"end","partial":false,"searchedThrough":"2026-12-03","checkedAt":"2026-11-14T12:00:00.000Z","pages":4,"count":18,"usage":{"date":"2026-11-14","requests":37,"photos":5}}
 ```
 
 `start.filters` contains the submitted filters. Each progress event contains only new matching
@@ -33,6 +33,8 @@ courses. `checkedAt` is the oldest contributing page's fetch time. Completion re
 `end`, `cap`, `same-date`, `nothing-new`, `allowance`, `paused`, `visitor-limit`, `cancelled`.
 An error event has `type: "error"`, `code`, `message`, `retryAfter` (seconds). Allowance, pause and
 visitor limits also produce a partial `done`; transport/response failures terminate with `error`.
+`done` and `error` carry `usage`: page and photo requests started upstream on the current UTC day,
+across all visitors, excluding cache hits. The footer shows it.
 The page keeps streamed rows, shows incomplete results or errors, and requires Search to retry.
 
 - Send Where, From, Course and Language upstream. Empty Course sends every in-scope type.
@@ -82,6 +84,7 @@ There is no background refresh, bulk course index or cache warming.
   before further uncached requests pause. Invalid individual courses are skipped and logged;
   they do not pause the gate. There are **no automatic retries**.
 - Default timeout: 20 s; slow threshold: over 10 s. Request logs include rolling hourly counts.
+  A persisted per-UTC-day count of started page and photo requests feeds `usage`.
 - Identity: `sitserve/<version> (+<SITE_URL>; <UPSTREAM_CONTACT>)`. Redirects are not followed.
   No cookies, browser identity, Origin or Referer are sent.
 

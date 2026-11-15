@@ -20,6 +20,8 @@ test('local Worker: static assets, NDJSON, validation, photos, and full restart 
     first = await events(r); assert.equal(first[0].type, 'start'); assert.equal(first[0].mode, 'simulator');
     assert.ok(first.some(e => e.type === 'progress')); assert.equal(first.at(-1).type, 'done');
     assert.equal(first.at(-1).count, 50); assert.ok(first.at(-1).checkedAt);
+    const usage = first.at(-1).usage; assert.match(usage.date, /^\d{4}-\d\d-\d\d$/);
+    assert.equal(usage.requests, first.at(-1).pages); assert.equal(usage.photos, 0);
     const courses = first.filter(e => e.type === 'progress').flatMap(e => e.courses);
     assert.ok(courses.every(c => !c.loc.photo || c.loc.photo.startsWith('/photo/')));
   });
@@ -38,6 +40,8 @@ test('local Worker: static assets, NDJSON, validation, photos, and full restart 
     assert.equal((await (await get('/api/debug')).json()).simulatorRequests,0);
     const second=await events(await get('/api/search?from=2026-11-14'));
     assert.equal(second.at(-1).checkedAt,first.at(-1).checkedAt);assert.equal(second.at(-1).count,50);
+    // Cached pages add nothing to the persisted daily count (unless the UTC day rolled over).
+    if (second.at(-1).usage.date === first.at(-1).usage.date) assert.deepEqual(second.at(-1).usage, first.at(-1).usage);
     assert.ok(second.filter(e=>e.type==='progress').every(e=>e.cacheHit));assert.equal((await (await get('/api/debug')).json()).simulatorRequests,0);
   });
 });

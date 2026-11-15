@@ -33,6 +33,12 @@ export class UpstreamGate {
     }
   }
   async save() { await this.storage.put('meta', this.meta); }
+  // Upstream requests started on the current UTC day, by bucket; the page footer shows them.
+  usage() {
+    const date = new Date(this.clock()).toISOString().slice(0, 10);
+    if (this.meta.today?.date !== date) this.meta.today = { date, requests: 0, photos: 0 };
+    return this.meta.today;
+  }
   beginSearch(ip, id) {
     this.active.get(ip)?.controller.abort();
     const session = { ip, id, controller: new AbortController(), charged: false };
@@ -182,7 +188,7 @@ export class UpstreamGate {
           if (times.length >= limit) throw new UpstreamError('allowance', 'The hourly upstream allowance is spent. Cached pages are still available.', Math.max(1, Math.ceil((times[0] + HOUR - this.clock()) / 1000)));
           // Configuration failures must not consume the allowance.
           if (this.env.UPSTREAM === 'live') buildRequest({ types: [3], regions: [], language: '', from: '2000-01-01', end: '2000-12-31', page: 1 }, this.env);
-          this.meta.lastStarted = this.clock(); times.push(this.clock()); await this.save();
+          this.meta.lastStarted = this.clock(); times.push(this.clock()); this.usage()[job.bucket]++; await this.save();
           this.log(JSON.stringify({ event: 'upstream', mode: this.env.UPSTREAM || 'simulator', bucket: job.bucket, requestsInHour: times.length, at: new Date(this.clock()).toISOString() }));
           const value = await job.run();
           for (const w of job.waiters) w.resolve(value);
@@ -258,6 +264,7 @@ export class UpstreamDurableObject {
     let filters;
     try { filters = parseFilters(url.searchParams, { today: serverToday(this.env), strict: true }); }
     catch (e) { return Response.json({ message: e.message }, { status: 400, headers: { 'Cache-Control': 'no-store' } }); }
+    await this.gate.ready;
     const session = this.gate.beginSearch(request.headers.get('CF-Connecting-IP') || 'local', request.headers.get('X-Sitserve-Search-Id'));
     const abort = () => session.controller.abort();
     request.signal.addEventListener('abort', abort, { once: true });
@@ -265,7 +272,11 @@ export class UpstreamDurableObject {
     let closed = false;
     const stream = new ReadableStream({
       start: controller => {
-        const emit = event => { if (!closed && !session.controller.signal.aborted) controller.enqueue(new TextEncoder().encode(JSON.stringify(event) + '\n')); };
+        const emit = event => {
+          if (closed || session.controller.signal.aborted) return;
+          if (event.type === 'done' || event.type === 'error') event = { ...event, usage: { ...this.gate.usage() } };
+          controller.enqueue(new TextEncoder().encode(JSON.stringify(event) + '\n'));
+        };
         emit({ type: 'start', mode: this.simulator ? 'simulator' : 'live', searchId: session.id, today: serverToday(this.env), filters });
         const task = search(filters, { today: serverToday(this.env), signal: session.controller.signal,
           getPage: p => this.gate.getPage(p, session), getCachedSequence: p => this.gate.getCachedSequence(p, session), emit }).catch(e => {

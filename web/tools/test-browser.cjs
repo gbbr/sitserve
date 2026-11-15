@@ -81,6 +81,7 @@ async function main() {
       assert.equal(await page.locator('#filter-controls').isVisible(), false);
       assert.ok(await page.locator('.summary').isVisible());
       assert.ok(await page.locator('footer').isVisible());
+      assert.match(await page.locator('#usage').innerText(), /^Simulated requests today \(UTC\): \d+ pages?, 0 photos$/);
       assert.equal(await page.locator('#search').isVisible(), false);
       assert.equal(await page.locator('#filter-toggle').getAttribute('aria-label'), 'Edit filters');
       assert.equal(await page.locator('#filter-summary [data-filter=where]').innerText(), 'Everywhere');
@@ -441,8 +442,14 @@ async function main() {
     });
     await check('location photo hover uses the local proxy placeholder', async () => {
       await load();
-      await page.locator('.row[data-id] .name[data-photo]').first().hover();
-      assert.ok(await page.locator('#photo').isVisible());
+      const names = page.locator('.row[data-id] .name[data-photo]');
+      // Passing over a name for less than the hover delay requests no photo.
+      await names.first().hover(); await page.mouse.move(0, 0); await page.waitForTimeout(300);
+      assert.equal(await page.locator('#photo').isVisible(), false);
+      assert.equal(await page.locator('#photo img').getAttribute('src'), null);
+      await names.first().hover();
+      assert.equal(await page.locator('#photo').isVisible(), false, 'photo waits for the hover delay');
+      await page.locator('#photo').waitFor({ state: 'visible' });
       assert.match(await page.locator('#photo img').getAttribute('src'), /^\/photo\/(?:system\/images|assets)\//);
       await page.waitForFunction(() => document.querySelector('#photo img').complete && document.querySelector('#photo img').naturalWidth > 0);
     });

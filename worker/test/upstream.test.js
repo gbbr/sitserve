@@ -95,6 +95,15 @@ test('photo cache persists seven days, has its own allowance and uses plain iden
   await assert.rejects(next.photo('/assets/other.jpg'),e=>e.code==='allowance');
   await a.clock.advance(7*86400000-1);await next.photo(path);assert.equal(a.calls,1);await a.clock.advance(1);await next.photo(path);assert.equal(a.calls,2);
 });
+test('daily usage counts started requests per UTC day, without cache hits or refusals',async()=>{
+  const a=make();await a.gate.getPage(params);await a.gate.getPage(params);await a.gate.getPage({...params,page:2});
+  assert.deepEqual(a.gate.usage(),{date:'2026-11-14',requests:2,photos:0});
+  const next=new UpstreamGate(a.options);await next.ready;assert.equal(next.usage().requests,2);
+  await a.clock.advance(12*3600000);assert.deepEqual(a.gate.usage(),{date:'2026-11-15',requests:0,photos:0});
+  const b=make({env:{UPSTREAM:'live',UPSTREAM_CONTACT:'test@example.invalid',PHOTO_ALLOWANCE:'1'},fetch:async()=>new Response(new Uint8Array(10),{headers:{'Content-Type':'image/jpeg'}})});
+  await b.gate.photo('/assets/a.jpg');await b.gate.photo('/assets/a.jpg');await assert.rejects(b.gate.photo('/assets/b.jpg'),e=>e.code==='allowance');
+  assert.deepEqual(b.gate.usage(),{date:'2026-11-14',requests:0,photos:1});
+});
 test('missing live identity sends no requests and spends no allowance',async()=>{
   const a=make({env:{UPSTREAM:'live'}});await assert.rejects(a.gate.getPage(params),e=>e.code==='configuration');assert.equal(a.calls,0);assert.equal(a.gate.meta.requests.length,0);
 });

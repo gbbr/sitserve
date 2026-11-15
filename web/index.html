@@ -244,6 +244,9 @@
 
   .empty { padding: 40px 8px; color: var(--muted); text-align: center; }
   footer { max-width: 1180px; margin: 0 auto; padding: 0 24px 32px; color: var(--faint); font-size: 12px; text-align: center; }
+  footer p { margin: 0; }
+  #usage { margin-top: 4px; font-variant-numeric: tabular-nums; }
+  #usage:empty { display: none; }
 
   /* Photo shown while hovering a location's name */
   #photo { position: fixed; z-index: 30; padding: 6px; border-radius: 10px; background: var(--popover-bg); box-shadow: var(--popover-shadow); pointer-events: none; }
@@ -372,7 +375,10 @@
 <div id="place-status" class="sr-only" role="status"></div>
 <div id="column-status" class="sr-only" role="status"></div>
 <main id="list"></main>
-<footer hidden>Course information from dhamma.org. Submit Search to check availability.</footer>
+<footer hidden>
+  <p>Course information from dhamma.org. Submit Search to check availability.</p>
+  <p id="usage"></p>
+</footer>
 
 <div id="photo" hidden><img alt=""><div></div></div>
 <div id="tip" hidden></div>

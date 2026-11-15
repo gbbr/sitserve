@@ -87,7 +87,9 @@ and a simulator, identified by a small “simulated data” badge.
   no "N hidden" count.
 - **Before the first search:** below the filters, show only "Choose your filters and press
   Search to find up to 50 matching courses." Hide the summary, legend and footer until a
-  search starts. The footer is centered when shown.
+  search starts. The footer is centered when shown. Its second line shows today's (UTC) requests
+  to dhamma.org from every search's final event: "Requests to dhamma.org today (UTC): 37 pages,
+  5 photos" ("Simulated requests" in dev). It updates only when a search finishes.
 - **Summary line:** "N courses you can sign up for", plus a legend: the blue non-center dot and
   the open / wait list / long wait list / closed lights.
 - **Result limit:** collect up to 50 courses that pass every filter, fetching more upstream
@@ -122,8 +124,9 @@ and a simulator, identified by a small “simulated data” badge.
        cell so it moves with the name when columns are reordered.
      - Hovering the flag shows the location ("Onalaska, Washington, United States"). For a
        non-center, the venue appears on the line above it.
-     - Hovering the name shows the photo (`header_image_path`, 284×200) with the full name and
-       its meaning. Clicking the name opens the center's website.
+     - Resting on the name for 150 ms shows the photo (`header_image_path`, 284×200) with the
+       full name and its meaning; the photo is requested only then, so passing over names costs
+       nothing. Clicking the name opens the center's website.
   2. **Dates**: "Nov 18 – 29" or "Nov 25 – Dec 6", with no year (the month heading has it). The
      end is at 40% opacity so the start stands out. Hovering shows the full dates with weekdays.
   3. **Type**:
