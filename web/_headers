@@ -1,0 +1,4 @@
+# Static responses: keep the site out of search engines and its address out of other sites' referrer logs.
+/*
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer

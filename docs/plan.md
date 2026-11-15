@@ -108,6 +108,9 @@ upstream request.
 
 sitserve is for private use by a few invited people. It runs at https://os.sutamaya.org behind
 Cloudflare Access, which admits only listed email addresses, so nobody else spends the allowance.
+Static responses also carry `X-Robots-Tag: noindex, nofollow` and `Referrer-Policy: no-referrer`
+(`web/_headers`): search engines skip the site even without Access, and outbound links don't
+reveal its address.
 Before opening it up, write to dhamma.org's
 webmasters about the limits and date cursor. If they object to the cursor, stop at their 100-course
 limit and show partial results.
