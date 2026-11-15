@@ -322,8 +322,16 @@ function setFilters(f) {
   renderPlaceChips();
   placeInput.value = '';
   closePlaces();
+  showApplicant();
   showLanguage();
 }
+// The As control shows the selected position's short code (DWM for a male Dhamma worker); its tooltip names it.
+function showApplicant() {
+  const option = form.elements.as.selectedOptions[0];
+  $('#as-code').textContent = option.dataset.code;
+  form.elements.as.parentElement.dataset.tip = `Applying as: ${option.textContent}`;
+}
+form.elements.as.addEventListener('input', showApplicant);
 // The Language control shows only the selected ISO code (nothing for any language); its tooltip names it.
 function showLanguage() {
   const select = form.elements.lang;

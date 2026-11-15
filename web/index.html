@@ -162,13 +162,9 @@
   .from-filter { cursor: pointer; }
   .from-filter input { width: 96px; font-variant-numeric: tabular-nums; }
   .from-filter input::-webkit-calendar-picker-indicator { display: none; }
-  .as-filter { padding: 0; }
-  .as-filter svg { position: absolute; left: 8px; }
-  .as-filter .chevron { left: auto; right: 7px; }
-  .as-filter select { appearance: none; padding: 0 25px 0 29px; cursor: pointer; field-sizing: content; }
-  /* Language shows only its code, or nothing for any language; the transparent select on top opens the list. */
-  .lang-filter { gap: 4px; padding: 0 7px; }
-  .lang-filter select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  /* As and Language show a short code; the transparent select on top opens the list of full names. */
+  .as-filter, .lang-filter { gap: 4px; padding: 0 7px; }
+  .as-filter select, .lang-filter select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
   .where-filter { flex: 1 1 260px; min-width: 0; margin-left: calc(var(--brand-w) + var(--edge-gap)); }
   .where-box { position: relative; width: 100%; min-width: 0; }
   .place-values { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 30px; padding: 3px 4px 3px 8px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--control-bg); cursor: text; }
@@ -332,7 +328,7 @@
     .where-filter { flex-basis: calc(100% - var(--brand-w) - var(--tools-w) - 2 * var(--edge-gap)); margin-right: calc(var(--tools-w) + var(--edge-gap)); }
     .from-filter, .as-filter { flex: 1 1 auto; }
     .from-filter input { flex: 1; }
-    .as-filter select { flex: 1 1 auto; }
+    .as-filter .chevron { margin-left: auto; }
     #types { order: 1; flex-basis: 100%; }
     .filter-sep { display: none; }
     .check { order: 2; }
@@ -389,15 +385,15 @@
       </div>
     </div>
     <span class="field from-filter" data-tip="Courses starting on or after this date"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><label for="from" class="sr-only">From</label><input type="date" name="from" id="from"></span>
-    <span class="field as-filter" data-tip="Applying as"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/></svg><select name="as" id="as" aria-label="Applying as">
-        <option value="any">Anyone</option>
-        <option value="NM">New male</option>
-        <option value="NF">New female</option>
-        <option value="OM">Old male</option>
-        <option value="OF">Old female</option>
-        <option value="SM">Server, male</option>
-        <option value="SF">Server, female</option>
-      </select><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+    <span class="field as-filter" data-tip="Applying as"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/></svg><span id="as-code" aria-hidden="true"></span><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><select name="as" id="as" aria-label="Applying as">
+        <option value="any" data-code="Anyone">Anyone</option>
+        <option value="NM" data-code="NM">New male</option>
+        <option value="NF" data-code="NF">New female</option>
+        <option value="OM" data-code="OM">Old male</option>
+        <option value="OF" data-code="OF">Old female</option>
+        <option value="SM" data-code="DWM">Server, male</option>
+        <option value="SF" data-code="DWF">Server, female</option>
+      </select></span>
     <span class="field lang-filter" data-tip="Any language"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg><span id="lang-code" aria-hidden="true"></span><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><select name="lang" id="lang" aria-label="Language"></select></span>
     <button type="submit" id="search" data-state="initial" aria-describedby="search-status">Search</button>
     </div>

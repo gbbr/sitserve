@@ -44,7 +44,8 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
   position and enlarges its lights from 8px to 10px. Column backgrounds and header labels
   stay neutral. Other
   positions' lights are dimmed to 28% opacity. Anyone restores all lights to their normal size
-  and opacity. The legend remains unchanged.
+  and opacity. The legend remains unchanged. The control shows the chosen position's short code
+  (NM, NF, OM, OF, DWM, DWF for Dhamma workers, or “Anyone”); its list and tooltip use full names.
 - **Lang** (one instruction language): the control shows only its icon and chevron, plus the
   chosen ISO code (“en”, “ro”); the tooltip names the language. Its list shows names and
   stores upstream ISO codes; old links such as `lang=English` restore as `lang=en`.
