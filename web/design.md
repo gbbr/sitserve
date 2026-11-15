@@ -109,7 +109,11 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
   bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
   Keep full month names and align these group headings to the left edge of the table, rather
-  than the Dates column. Rows sort by start date, then name. The table header uses a warm
+  than the Dates column. Within each month, rows sort by start date, then name; or, after the
+  Type heading is clicked, by course type in chip order (14D and TSC together), then date and
+  name. Clicking Dates restores date order. The active heading is darker, with a small chevron
+  after its label; the other shows a faint chevron on hover. The choice is stored in localStorage
+  as `sit.sort`. Phones, which hide the headings, use the stored order. The table header uses a warm
   tinted band and bottom border spanning the full page width, square corners, compact uppercase
   labels and subtle column dividers. Result rows retain their constrained width.
   New / Old / SRV each has a fine grouping rule above its M / F labels. Month counts use a

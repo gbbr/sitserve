@@ -241,6 +241,14 @@
   .column-head:hover { color: var(--fg); }
   .column-head:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   .column-head[data-column=type], .column-head[data-column=apply], .column-head[data-column=links] { justify-content: center; }
+  /* Dates and Type sort the rows. A chevron beside the label marks the active sort and hints at the
+     other on hover; it sits outside the label's box so centered labels stay aligned with their column. */
+  .column-head.sortable { cursor: pointer; }
+  .head-label { position: relative; }
+  .head-label svg { position: absolute; top: 50%; left: calc(100% + 2px); width: 11px; height: 11px; transform: translateY(-50%); fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .12s; }
+  .column-head.sortable:hover .head-label svg { opacity: .45; }
+  .column-head[aria-pressed=true] { color: var(--fg); }
+  .column-head[aria-pressed=true] .head-label svg { opacity: 1; }
   .column-head.dragging { opacity: .35; }
   .column-head[data-drop=before] { box-shadow: -3px 0 var(--link); }
   .column-head[data-drop=after] { box-shadow: 3px 0 var(--link); }

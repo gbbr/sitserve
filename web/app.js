@@ -23,6 +23,7 @@ const ICONS = {
   schedule: svg('<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
   notes: svg('<path d="M6 3.5h8.5L19 8v12.5H6z"/><path d="M14 3.5V8h5M9 12.5h7M9 16h5"/>'),
   place: svg('<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/>'),
+  sort: svg('<path d="m6 9 6 6 6-6"/>'),
   person: svg('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/>'),
   moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>'),
@@ -234,6 +235,23 @@ function saveColumnOrder(next, moved) {
   $('#column-status').textContent = `${DISPLAY_COLUMNS[moved].label} moved to column ${next.indexOf(moved) + 1} of ${next.length}.`;
 }
 
+// Rows stay grouped by start month. Within a month they sort by start date, or by course type in
+// chip order and then by date. The choice is stored in localStorage as `sit.sort`.
+const SORTS = { dates: 'date', type: 'type within each month' };
+const TYPE_RANK = new Map(FILTER_TYPES.map(([raw], i) => [raw, i]));
+TYPE_RANK.set('TSC', TYPE_RANK.get('14-DayGratitude'));
+let sortBy = 'dates';
+try { if (Object.hasOwn(SORTS, localStorage.getItem('sit.sort'))) sortBy = localStorage.getItem('sit.sort'); } catch { /* blocked storage: sort by date */ }
+list.addEventListener('click', e => {
+  const heading = e.target.closest('.column-head.sortable');
+  if (!heading || heading.dataset.column === sortBy) return;
+  sortBy = heading.dataset.column;
+  try { localStorage.setItem('sit.sort', sortBy); } catch { /* lasts until reload */ }
+  render();
+  list.querySelector(`.column-head[data-column="${sortBy}"]`)?.focus({ preventScroll: true });
+  $('#column-status').textContent = `Sorted by ${SORTS[sortBy]}.`;
+});
+
 let draggedColumn = null;
 function clearDrag() {
   for (const el of list.querySelectorAll('.column-head')) { delete el.dataset.drop; el.classList.remove('dragging'); }
@@ -377,7 +395,9 @@ function headHTML(f) {
     `<span class="l${k === f.as ? ' hl' : ''}" data-tip="${COLUMN_NAME[k]}">${k.slice(-1)}</span>`).join('')}</span>`).join('');
   return `<div class="row head">${columnOrder.map(key => {
     const label = DISPLAY_COLUMNS[key].label;
-    return `<button type="button" class="column-head${key === 'lights' ? ' lights' : ''}" data-column="${key}" draggable="true" aria-label="${label}. Drag to reorder, or use Alt and left or right arrow." aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" data-tip="${label}\nDrag to reorder · Alt + ← / →">${key === 'lights' ? cols : esc(label)}</button>`;
+    if (!Object.hasOwn(SORTS, key)) return `<button type="button" class="column-head${key === 'lights' ? ' lights' : ''}" data-column="${key}" draggable="true" aria-label="${label}. Drag to reorder, or use Alt and left or right arrow." aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" data-tip="${label}\nDrag to reorder · Alt + ← / →">${key === 'lights' ? cols : esc(label)}</button>`;
+    const sorted = key === sortBy, sort = `${sorted ? 'Sorted' : 'Sort'} by ${SORTS[key]}`;
+    return `<button type="button" class="column-head sortable" data-column="${key}" draggable="true" aria-pressed="${sorted}" aria-label="${label}. ${sort}. Drag to reorder, or use Alt and left or right arrow." aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" data-tip="${sort}\nDrag to reorder · Alt + ← / →"><span class="head-label">${esc(label)}${ICONS.sort}</span></button>`;
   }).join('')}</div>`;
 }
 
@@ -598,6 +618,7 @@ function render() {
     if (!months.has(key)) months.set(key, []);
     months.get(key).push(item);
   }
+  if (sortBy === 'type') for (const items of months.values()) items.sort(([a], [b]) => TYPE_RANK.get(a.type) - TYPE_RANK.get(b.type));
   list.innerHTML = shown.length
     ? headHTML(f) + [...months].map(([key, items]) => {
         const [y, m] = ymd(key);

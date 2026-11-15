@@ -346,6 +346,37 @@ async function main() {
       await reload();
     });
 
+    await check('Type and Dates headings sort rows within each month and the choice persists', async () => {
+      // Each month's rows as [id, type code], in display order.
+      const months = () => page.locator('#list').evaluate(list => {
+        const groups = [];
+        for (const el of list.children) {
+          if (el.tagName === 'H2') groups.push([]);
+          else if (el.matches('.row[data-id]')) groups.at(-1).push([el.dataset.id, el.querySelector('.type-code').textContent]);
+        }
+        return groups;
+      });
+      const pressed = () => page.locator('.column-head.sortable').evaluateAll(els => els.filter(el => el.getAttribute('aria-pressed') === 'true').map(el => el.dataset.column));
+      assert.deepEqual(await page.locator('.column-head.sortable').evaluateAll(els => els.map(el => el.dataset.column).sort()), ['dates', 'type']);
+      assert.deepEqual(await pressed(), ['dates']);
+      const byDate = await months();
+      const chips = await page.locator('#types input').evaluateAll(inputs => inputs.map(i => i.value));
+      const rank = code => chips.indexOf(['14D', 'TSC'].includes(code) ? '14D/TSC' : code);
+      const expected = byDate.map(rows => [...rows].sort((a, b) => rank(a[1]) - rank(b[1])));
+      assert.notDeepEqual(expected, byDate, 'fixture needs a month whose date and type orders differ');
+      await page.locator('.column-head[data-column=type]').click();
+      assert.deepEqual(await pressed(), ['type']);
+      assert.deepEqual(await months(), expected);
+      assert.equal(await page.locator('.column-head[data-column=type]').evaluate(el => el === document.activeElement), true);
+      assert.equal(await page.locator('.column-head[data-column=type] svg').evaluate(el => getComputedStyle(el).opacity), '1');
+      await reload();
+      assert.deepEqual(await months(), expected);
+      await page.locator('.column-head[data-column=dates]').press('Enter');
+      assert.deepEqual(await pressed(), ['dates']);
+      assert.deepEqual(await months(), byDate);
+      await page.evaluate(() => localStorage.removeItem('sit.sort'));
+    });
+
     await check('no horizontal overflow at phone, breakpoint and desktop widths', async () => {
       for (const width of [320, 375, 390, 600, 820, 821, 1024, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
