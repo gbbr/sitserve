@@ -45,8 +45,10 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
   with beige text; controls, popovers, borders and hover surfaces share that warm palette. The
   accent is brown in light mode and golden beige in dark mode; availability keeps its familiar
   colors.
-- **Search** submits all filters together. Nothing searches automatically: not filter changes,
-  place selection, page load or a restored link. The button always says Search, so the row doesn't
+- **Search** submits all filters together. The last submitted filters are saved in this browser
+  and searched automatically on return, using the normal cache and fetch behavior. Filter edits
+  and place selection wait for Search. A first visit or a different shared link also waits for
+  Search. The button always says Search, so the row doesn't
   shift: solid brown with a search icon before the first search, quiet and outlined with a
   checkmark when the results match the filters (it still runs the search again), solid amber with
   a refresh icon after the filters change, and disabled with a spinner while loading. Edits leave
@@ -57,8 +59,10 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
   only while there's something to say, with a Cancel link while loading. Empty, error, allowance,
   paused and visitor-limit states are explicit, and retrying always takes Search.
 - **URL**: submitted filters live in the URL fragment, so a search can be bookmarked or shared.
-  Opening a link restores the form; press Search to fetch results. Edits during a search, column
-  reordering and theme changes leave the submitted filters and URL alone.
+  A link matching the saved search reruns it automatically; a different link restores the form
+  and waits for Search. Edits during a search, column reordering and theme changes leave the
+  submitted filters, saved search and URL alone. The saved search includes its explicit From
+  date, even when that date was omitted from the URL.
 - **Auto-collapse**: after a successful search, the filters collapse to a compact summary. Results
   appear first; after a short pause the bar slides shut while its contents fade, and they fade
   back in when it reopens (no animation with reduced motion). One filter button beside the theme

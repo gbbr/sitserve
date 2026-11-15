@@ -1,8 +1,10 @@
 # sitserve architecture
 
 sitserve finds Vipassana courses on dhamma.org that still accept applications. The page in `web/`
-and the Cloudflare Worker in `worker/` share filtering in `web/shared/courses.js`. Only pressing
-Search queries course availability. The UI is described in [design.md](design.md), and
+and the Cloudflare Worker in `worker/` share filtering in `web/shared/courses.js`. Pressing Search
+queries course availability and saves the submitted filters in localStorage as `sit.search`.
+Returning to the page reruns that search through the same cache and upstream path, unless the
+URL specifies a different search. The UI is described in [design.md](design.md), and
 dhamma.org's own behavior in [dhamma-api.md](dhamma-api.md).
 
 ## Search and stream

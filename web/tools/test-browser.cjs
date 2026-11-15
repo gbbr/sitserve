@@ -40,8 +40,17 @@ async function main() {
       await page.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
       if (edit) await expandFilters();
     };
-    const load = async fragment => { await page.goto(url + (fragment ? '#' + fragment : '')); await submit(); };
-    const reload = async () => { await page.reload(); await submit(); };
+    const load = async fragment => {
+      // These checks start a new search; returning to a saved search is checked separately.
+      await page.evaluate(() => localStorage.removeItem('sit.search'));
+      await page.goto(url + (fragment ? '#' + fragment : ''));
+      await submit();
+    };
+    const reload = async () => {
+      await page.reload();
+      await page.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
+      await expandFilters();
+    };
     const rowIDs = () => page.locator('.row[data-id]').evaluateAll(rows => rows.map(r => +r.dataset.id).sort((a, b) => a - b));
     const order = () => page.locator('.head > [data-column]').evaluateAll(cells => cells.map(c => c.dataset.column));
     const search = page.locator('#place-search');
@@ -112,6 +121,90 @@ async function main() {
           assert.equal(await localPage.locator('[name=from]').inputValue(), '2026-12-01');
           assert.equal(await localPage.locator('.row[data-id]').count(), 0);
         } finally { await localPage.close(); }
+      }
+    });
+
+    await check('return visits rerun only the last submitted search and reuse cached results', async () => {
+      const context = await browser.newContext({ timezoneId: 'UTC' });
+      await context.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+      context.on('page', p => p.on('pageerror', error => errors.push(error.message)));
+      let requests = 0;
+      context.on('request', request => { if (new URL(request.url()).pathname === '/api/search') requests++; });
+      const open = async (date = '2026-11-14T12:00:00Z') => {
+        const p = await context.newPage();
+        await p.clock.setFixedTime(new Date(date));
+        return p;
+      };
+      let p = await open();
+      const complete = () => p.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
+      const ids = () => p.locator('.row[data-id]').evaluateAll(rows => rows.map(row => row.dataset.id));
+      try {
+        await p.goto(url + '#where=region_402&types=10D');
+        assert.equal(await p.locator('#search').getAttribute('data-state'), 'initial');
+        assert.equal(requests, 0, 'a new shared link waits for Search');
+        await p.locator('#search').click();
+        await complete();
+        const originalIDs = await ids(), submittedURL = p.url();
+        assert.ok(originalIDs.length > 0);
+        assert.equal(requests, 1);
+        await p.locator('#filter-toggle').click();
+        await p.waitForFunction(() => !document.querySelector('#filter-panel').hasAttribute('data-animating'));
+        await p.locator('[name=from]').fill('2027-01-01');
+        await p.locator('[name=as]').selectOption('OM');
+        await p.close();
+
+        p = await open();
+        const response = p.waitForResponse(response => new URL(response.url()).pathname === '/api/search');
+        await p.goto(url);
+        await complete();
+        assert.equal(requests, 2, 'reopening submits exactly one search without a click');
+        assert.equal(await p.locator('[name=from]').inputValue(), '2026-11-14');
+        assert.equal(await p.locator('[name=as]').inputValue(), 'any', 'unsent edits are discarded');
+        assert.equal(await p.locator('[name=where]').inputValue(), 'region_402');
+        assert.equal(await p.locator('[name=types][value="10D"]').isChecked(), true);
+        assert.deepEqual(await ids(), originalIDs);
+        const progress = (await (await response).text()).trim().split('\n').map(line => JSON.parse(line)).filter(event => event.type === 'progress');
+        assert.ok(progress.length > 0 && progress.every(event => event.cacheHit), 'the restored search uses the backend cache');
+        await p.reload();
+        await complete();
+        assert.equal(requests, 3, 'reloading the submitted URL also reruns the search once');
+        assert.deepEqual(await ids(), originalIDs);
+        await p.close();
+
+        p = await open();
+        await p.goto(url + '#types=20D');
+        assert.equal(await p.locator('#search').getAttribute('data-state'), 'initial');
+        assert.equal(await p.locator('[name=types][value="20D"]').isChecked(), true);
+        assert.equal(await p.locator('.row[data-id]').count(), 0);
+        assert.equal(requests, 3, 'a different shared link takes precedence and waits for Search');
+        await p.close();
+
+        p = await open('2026-11-15T12:00:00Z');
+        await p.goto(submittedURL);
+        await complete();
+        assert.equal(requests, 4);
+        assert.equal(await p.locator('[name=from]').inputValue(), '2026-11-14', 'an implicit From date survives returning on a later day');
+        assert.deepEqual(await ids(), originalIDs, 'an unsubmitted shared link does not replace the saved search');
+      } finally { await context.close(); }
+    });
+
+    await check('invalid or blocked saved-search storage leaves explicit Search working', async () => {
+      for (const blocked of [false, true]) {
+        const p = await safePage({ timezoneId: 'UTC' });
+        p.on('pageerror', error => errors.push(error.message));
+        try {
+          await p.clock.setFixedTime(new Date('2026-11-14T12:00:00Z'));
+          await p.addInitScript(blocked => {
+            if (blocked) Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Storage blocked', 'SecurityError'); } });
+            else localStorage.setItem('sit.search', 'from=invalid');
+          }, blocked);
+          await p.goto(url + '#types=10D');
+          assert.equal(await p.locator('#search').getAttribute('data-state'), 'initial');
+          assert.equal(await p.locator('[name=types][value="10D"]').isChecked(), true);
+          await p.locator('#search').click();
+          await p.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
+          assert.ok(await p.locator('.row[data-id]').count() > 0);
+        } finally { await p.close(); }
       }
     });
 
@@ -541,6 +634,7 @@ async function main() {
       assert.deepEqual(errors, []);
     });
     await check('Search button states preserve pending edits in both themes', async () => {
+      await page.evaluate(() => localStorage.removeItem('sit.search'));
       await page.goto(url);
       assert.equal(await page.locator('#search').getAttribute('data-state'), 'initial');
       await submit();

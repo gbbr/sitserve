@@ -541,6 +541,7 @@ async function searchCourses() {
     void fetch('/api/cancel?id=' + encodeURIComponent(active.id), { method: 'POST', keepalive: true }).catch(() => {});
   }, { once: true });
   const f = readFilters(), result = { filters: f, shown: [], loading: true, partial: false, searchedThrough: null, checkedAt: null };
+  try { localStorage.setItem('sit.search', serializeFilters(f, { today: TODAY, includeDefaults: true })); } catch { /* blocked storage: the URL still holds this search */ }
   searchResult = result;
   byId.clear();
   history.replaceState(null, '', '#' + toFragment(f));
@@ -798,6 +799,16 @@ $('#types').innerHTML = FILTER_TYPES.map(([raw, short]) =>
   `<label class="chip ${typeClass(raw)}" data-tip="${esc(filterTypeTip(raw))}"><input type="checkbox" name="types" value="${esc(short)}"><span>${esc(short)}</span></label>`).join('');
 form.elements.lang.innerHTML = '<option value="">Any language</option>'
   + LANGUAGES.map(([code, name]) => `<option value="${esc(code)}">${esc(name)}</option>`).join('');
-setFilters(fromFragment());
+// Remember submitted filters only. The normal search path handles cached and fresh results.
+let lastSearch = null;
+try {
+  const saved = localStorage.getItem('sit.search');
+  if (saved !== null) lastSearch = parseFilters(saved, { today: TODAY, strict: true });
+} catch { /* blocked storage or invalid filters: start from the URL */ }
+// A date omitted from the saved search's URL still refers to its original From date.
+const restoreLastSearch = lastSearch && (!location.hash
+  || toFragment(parseFilters(location.hash, { today: lastSearch.from })) === toFragment(lastSearch));
+setFilters(restoreLastSearch ? lastSearch : fromFragment());
 updateSearchStatus();
 render();
+if (restoreLastSearch) void searchCourses();
