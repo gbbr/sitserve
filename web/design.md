@@ -4,10 +4,16 @@ A single page for finding Vipassana courses on dhamma.org that you can still sig
 `web/index.html` and `web/app.js` are plain HTML, CSS and ES modules: no framework or page build
 step. A Cloudflare Worker streams up to 50 matches after all filters. Flags are local assets;
 location photos use the same-origin Worker proxy. Local development uses saved real responses
-and a simulator, identified by a small “simulated data” badge.
+and a simulator, identified by a small amber dot on the wheel (“Simulated data”).
 
 ## Filter bar (sticky, top)
 
+- **Layout**: two rows on desktop. The first holds dhamma.org's wheel (`assets/wheel/`, from its
+  design standards, with its source and hashes), Where, From, As, Lang, Search,
+  then the filter toggle and theme switch. The second holds the course chips, aligned with
+  Where, then the Wait lists, Not open yet and Centers only checkboxes. Icons replace the
+  Where, From, As and Lang labels. From's calendar icon opens the date picker (the browser's own
+  picker icon is hidden), and its tooltip says courses start on or after the date.
 - **Where**: places as chips; see [Where box](#where-box). Courses in any chosen place show.
 - **From**: start date, default the viewer's current local calendar date. Preserve a date
   explicitly supplied in the URL fragment. No end date control: search courses starting from
@@ -39,9 +45,10 @@ and a simulator, identified by a small “simulated data” badge.
   stay neutral. Other
   positions' lights are dimmed to 28% opacity. Anyone restores all lights to their normal size
   and opacity. The legend remains unchanged.
-- **Lang** (one instruction language) and **centers only**. The select shows names and stores
-  upstream ISO codes; old links such as `lang=English` restore as `lang=en`.
-- **Show**: wait lists (on by default) and not open yet (on by default).
+- **Lang** (one instruction language): the control shows only its icon and chevron, plus the
+  chosen ISO code (“en”, “ro”); the tooltip names the language. Its list shows names and
+  stores upstream ISO codes; old links such as `lang=English` restore as `lang=en`.
+- **Wait lists** and **Not open yet** (both on by default), and **Centers only**.
 - **Theme switch**, top right: light/dark. The page follows the system until the switch is
   clicked, then remembers the choice in localStorage. Light uses a warm ivory background
   (`#f7f1e5`) and sepia text; dark uses deep brown (`#211c18`) and beige text. Controls,
@@ -54,15 +61,13 @@ and a simulator, identified by a small “simulated data” badge.
   skip the animation. **Edit filters** reopens the existing controls without changing results
   or selections; **Hide filters** closes them again. One filter icon button stays visible
   at the top right beside the theme switch, with the current action as its tooltip and
-  accessible label. Search appears only with the open controls, aligned right with its status
-  text immediately to its left. Pending edits made
+  accessible label. Clicking anywhere else on the collapsed bar, except the theme switch, also
+  reopens the controls. Search appears only with the open controls. Pending edits made
   during a search, errors and cancellation leave the controls open. Reopening controls during
   a search also keeps them open when it finishes. Page load and shared links start expanded.
   The compact summary groups neutral place pills with a location icon, a bordered date chip,
   course badges using their existing category colors, and quieter applicant/language/option
   chips. A long summary scrolls horizontally. On phones the summary uses a second row.
-- **Expanded layout**: Where, From, As and Lang share the first row on desktop. Course
-  types lead the second row, followed by centers only and the Show checkboxes.
 - **Search**: submits all filters together. No automatic search on filter changes, place
   selection, page load or URL restoration. The compact button says **Search** in its resting
   states: solid brown with a search icon before the first submission; quiet outlined with a
@@ -70,11 +75,12 @@ and a simulator, identified by a small “simulated data” badge.
   filters change. The amber background is distinct in both themes. Pending edits leave the
   submitted results in place and show "Filters changed. Press Search to update results." in
   yellow with a warning icon, in both themes. Restoring the submitted filters restores the
-  completed state; the button remains clickable to run the search again. While loading it says
-  “Searching…”, is disabled, and shows progress through the last searched date. Cancel stops the
-  stream. Edits during loading preserve the submitted results and show the pending warning.
+  completed state; the button remains clickable to run the search again. While loading it keeps
+  its label, so the row doesn't shift, shows a spinning icon and is disabled. Status text
+  (progress through the last searched date, pending, error and cancelled messages) and a Cancel
+  link sit at the right of the results line, in place of “Checked …”. Cancel stops the stream.
+  Edits during loading preserve the submitted results and show the pending warning.
   Column reordering and theme changes preserve the submitted filters too.
-  The initial helper, "Up to 50 matching courses per search.", uses the faint text color.
 - Submitted filters live in the URL fragment, so a search can be bookmarked or shared.
   Opening a link restores the form; press Search to retrieve results.
 
@@ -97,7 +103,7 @@ and a simulator, identified by a small “simulated data” badge.
   date. At 50 matches, suggest changing the filters to find others; there is no pagination or
   Load more. A search stopped early by its page cap is partial: mark it clearly ("Searched
   through Dec 3") and suggest a later From or narrower filters. Show when the results were
-  checked ("Checked 12 min ago"). The backend enforces the same page cap for cached and fresh
+  checked ("Checked 12 min ago", in small faint text). The backend enforces the same page cap for cached and fresh
   pages; cursor and same-date stops are also reported as partial.
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
   bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
@@ -132,13 +138,17 @@ and a simulator, identified by a small “simulated data” badge.
      end is at 40% opacity so the start stands out. Hovering shows the full dates with weekdays.
   3. **Type**:
      - Shows a centered, compact badge containing the chip code. The Type heading is centered too.
-     - Basic courses (3D, 10D, 10D OS, EXEC) use warm brown text on a neutral background with a fine
-       border. A crisp outline and readable text keep these from looking disabled.
+     - Basic courses (3D, 10D, 10D OS, EXEC) use warm brown text on a neutral to sand background
+       with a fine border. A crisp outline and readable text keep these from looking disabled.
      - Long courses (10D SPCL and 20/30/45/60D) use a subtle violet tint.
      - STP, 14D and TSC use a subtle teal tint, distinct from both basic and long courses.
        This grouping is visual; the actual course code remains visible in every badge.
-     - Match the filter chips to these same groups. Selected chips use a solid fill so their
-       selection remains clear. Do not tint entire rows: availability remains easy to scan.
+     - Within a color group, badges differ by type. Ordered by length, the first half of a
+       group's types are tints that deepen and the rest solid fills, deepening too: 3D, 10D tints
+       and 10D OS, EXEC solid; STP, 14D tints and TSC solid; 10D SPCL, 20D, 30D tints and 45D,
+       60D solid. Filter chips and summary tokens keep one color per group; selected chips use
+       a solid fill so their selection remains clear. Do not tint entire rows: availability
+       remains easy to scan.
      - Hovering the code shows the full name, with the languages on a second line.
   4. **Lights**: six 13px columns with a two-row heading: NEW / OLD / SRV, each over M F.
      Columns in a pair are 2px apart, groups 12px apart.
@@ -180,13 +190,26 @@ meanings, rendered as compact circular CSS lights:
 - The official site's semaphore PNGs were downloaded from its stylesheet and are retained in
   `assets/status/` with their source and hashes. The current UI uses the round CSS lights.
 
-Course badge colors (foreground / background):
+Filter chip and summary token colors (foreground / background); a selected chip fills with its
+foreground color:
 
 | Group | Light | Dark |
 |---|---|---|
 | Basic | `#74614e` / `#fcf7ed`, control border | `#cbb79c` / `#2b231d`, control border |
 | Long | `#805d8b` / `#eee3ed` | `#ceb0d2` / `#392c38` |
 | STP / 14D / TSC | `#426e60` / `#e5ece0` | `#a8c6ad` / `#26332a` |
+
+Result badge ramps. Tints use the ink color as text; solid fills use the page background. Each
+part runs from its first to its last color, mixed in OKLCH:
+
+| Group | Theme | Tints | Ink | Solid fills |
+|---|---|---|---|---|
+| Basic | Light | `#faf6ef` → `#e9d6bd`, control border | `#5c412c` | `#846546` → `#523525` |
+| Basic | Dark | `#2a241f` → `#46372a`, control border | `#dfcfb4` | `#ae8b63` → `#dcc8a6` |
+| STP / 14D / TSC | Light | `#e6f7ed` → `#b1dfc5` | `#16513c` | `#35775d` → `#0b4834` |
+| STP / 14D / TSC | Dark | `#1c2a22` → `#244534` | `#b0dec4` | `#579d79` → `#9dd3b5` |
+| Long | Light | `#faedfa` → `#d9bae7` | `#562b71` | `#8050a0` → `#3e256e` |
+| Long | Dark | `#2d2230` → `#4b355b` | `#e3c4f1` | `#9f76cb` → `#dab3ed` |
 
 How a status's `type` fills the columns:
 - `m` fills NM and OM; `w` fills NF and OF; `s` fills SM and SF.
@@ -239,14 +262,15 @@ codes such as "WA" or "IN".
 
 - Above 820px, keep the compact full-width desktop grid, sticky filters, column headings and
   month headings. Do not apply the phone layout to wide screens.
-- At 820px and below, the filter bar becomes a normal scrolling section. Its controls use a
-  two-column grid; Where, Course and Also show span both columns, and chips wrap within the
-  available space. The theme button stays in the top right beside the brand.
+- At 820px and below, the filter bar becomes a normal scrolling section. Where shares the
+  first line with the wheel and the two buttons; From, As and Lang share the next line when
+  they fit. Chips and checkboxes wrap within the available space, and a full-width Search ends
+  the controls.
 - Hide column headings in this layout. Each row shows Location first, then Dates / Type /
   Apply, then the labeled applicant lights and trailing icons. Month headings stick at the
   top of the viewport. Fixed named grid areas keep this arrangement independent of the saved
   desktop column order.
-- At 380px and below, filters use one column and row icons move below the lights. Avoid
+- At 380px and below, row icons move below the lights. Avoid
   horizontal scrolling at phone widths. Keep controls and suggestion panels within the viewport.
 - Re-measure sticky offsets when the filter bar or list resizes, including when crossing the
   breakpoint. Preserve fractional pixel heights and overlap adjacent sticky layers by 1px so

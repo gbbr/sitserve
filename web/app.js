@@ -1,6 +1,6 @@
 import { LANGUAGES } from './places.js';
-import { COLUMNS, GROUPS, KEYS, COLUMN_NAME, LIGHTS, TYPE, FILTER_TYPES,
-  typeClass, typeTip, filterTypeTip, fold, places, placeByKey, lights, availability,
+import { COLUMNS, GROUPS, KEYS, COLUMN_NAME, LIGHTS, TYPE, TYPES, FILTER_TYPES,
+  typeClass, typeTip, filterTypeTip, filterDuration, fold, places, placeByKey, lights, availability,
   filterDefaults, parseFilters, serializeFilters } from './shared/courses.js';
 
 'use strict';
@@ -16,6 +16,7 @@ const ICONS = {
   search: svg('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   check: svg('<path d="m5 12 4 4L19 6"/>'),
   refresh: svg('<path d="M20 7v5h-5M19.5 12a7.5 7.5 0 1 0-2 5.5M20 12l-3-4"/>'),
+  spinner: svg('<path d="M20.5 12A8.5 8.5 0 1 1 12 3.5"/>'),
   filters: svg('<path d="M4 7h7m4 0h5M4 17h3m4 0h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
   warning: svg('<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5M12 17h.01"/>'),
   web: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>'),
@@ -35,6 +36,17 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<':
 const inertHTML = html => { const el = document.createElement('template'); el.innerHTML = html; return el.content; };
 const textOf = html => inertHTML(html).textContent.replace(/\s+/g, ' ').trim();
 const FLAG_CODES = new Set(["ae","ar","au","be","br","ca","co","de","es","fr","gb","gr","id","il","in","it","jp","kr","lk","mm","nl","np","pe","pl","ru","se","th","tw","us","vn"]);
+// Result badges tell like-colored types apart: within each color group, ordered by length, the
+// first half are tints and the rest solid fills, each shaded from 0 to 1 along its part.
+const BADGE_TONES = new Map();
+for (const group of new Set(TYPES.map(([raw]) => typeClass(raw)))) {
+  const raws = TYPES.map(([raw]) => raw).filter(raw => typeClass(raw) === group).sort((a, b) => filterDuration(a) - filterDuration(b));
+  const tints = Math.ceil(raws.length / 2);
+  raws.forEach((raw, i) => {
+    const solid = i >= tints, count = solid ? raws.length - tints : tints, index = solid ? i - tints : i;
+    BADGE_TONES.set(raw, { solid, shade: count > 1 ? +(index / (count - 1)).toFixed(3) : 0 });
+  });
+}
 const flag = cc => FLAG_CODES.has((cc || '').toLowerCase()) ? `<img src="assets/flags/${cc.toLowerCase()}.svg" alt="">` : esc(/^[a-z]{2}$/i.test(cc || '') ? cc.toUpperCase() : '?');
 
 // The Where control stores stable place keys; typing only searches suggestions.
@@ -195,6 +207,7 @@ $('#place-chips').addEventListener('click', e => {
   placeInput.focus();
   closePlaces();
 });
+$('.place-values').addEventListener('click', e => { if (!e.target.closest('button, input')) placeInput.focus(); });
 $('#where-box').addEventListener('focusout', e => { if (!e.currentTarget.contains(e.relatedTarget)) closePlaces(); });
 document.addEventListener('pointerdown', e => { if (!e.target.closest('#where-box')) closePlaces(); });
 
@@ -309,7 +322,19 @@ function setFilters(f) {
   renderPlaceChips();
   placeInput.value = '';
   closePlaces();
+  showLanguage();
 }
+// The Language control shows only the selected ISO code (nothing for any language); its tooltip names it.
+function showLanguage() {
+  const select = form.elements.lang;
+  $('#lang-code').textContent = select.value;
+  select.parentElement.dataset.tip = select.value ? select.selectedOptions[0].textContent : 'Any language';
+}
+form.elements.lang.addEventListener('input', showLanguage);
+$('.from-filter').addEventListener('click', e => {
+  if (e.target === form.elements.from) return;
+  try { form.elements.from.showPicker(); } catch { form.elements.from.focus(); }
+});
 const toFragment = f => serializeFilters(f, { today: TODAY });
 const fromFragment = () => parseFilters(location.hash, { today: TODAY });
 
@@ -331,7 +356,7 @@ function rowHTML(c, avail, f) {
   const cells = {
     location: `<span class="who" data-column="location"><span class="flag" role="img" aria-label="${esc(l.venue ? `${l.venue}, ${l.place}` : l.place)}" data-tip="${esc(l.venue ? `${l.venue}\n${l.place}` : l.place)}">${flag(l.cc)}</span>${l.web ? `<a class="name" href="${esc(l.web)}" target="_blank" rel="noopener"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</a>` : `<span class="name"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</span>`}${l.center ? '' : '<span class="kind noncenter" data-tip="non-center"></span>'}</span>`,
     dates: `<span class="dates" data-column="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>`,
-    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span></span>`,
+    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}${BADGE_TONES.get(c.type).solid ? ' solid' : ''}" style="--shade: ${BADGE_TONES.get(c.type).shade}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span></span>`,
     lights: `<span class="lights" data-column="lights">${lightCells}</span>`,
     apply: `<span class="reg" data-column="apply"${avail === 'soon' ? ` data-tip="Registration opens ${esc(longDate(c.enroll))}"` : ''}>${reg}</span>`,
     links: `<span class="links" data-column="links">${link(l.schedule, 'Course schedule', ICONS.schedule)}${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
@@ -437,16 +462,21 @@ $('#filter-toggle').addEventListener('click', () => {
   if (collapsed && searchResult) searchResult.keepFiltersOpen = true;
   setFiltersCollapsed(!collapsed);
 });
+$('.bar').addEventListener('click', e => {
+  if (form.dataset.collapsed !== 'true' || e.target.closest('button')) return;
+  if (searchResult) searchResult.keepFiltersOpen = true;
+  setFiltersCollapsed(false);
+});
 
 function updateSearchStatus() {
   const filters = readFilters();
   const pending = searchResult && toFragment(filters) !== toFragment(searchResult.filters);
   const state = searchResult?.loading ? 'loading' : !searchResult ? 'initial' : pending ? 'pending' : 'complete';
-  const icon = { initial: ICONS.search, complete: ICONS.check, pending: ICONS.refresh, loading: ICONS.refresh }[state];
+  const icon = { initial: ICONS.search, complete: ICONS.check, pending: ICONS.refresh, loading: ICONS.spinner }[state];
   const button = $('#search');
   button.dataset.state = state;
   button.disabled = state === 'loading';
-  button.innerHTML = `${icon}<span>${state === 'loading' ? 'Searching…' : 'Search'}</span>`;
+  button.innerHTML = `${icon}<span>Search</span>`;
   $('#cancel').hidden = state !== 'loading';
   const compactSummary = $('#filter-summary');
   const compactHTML = filterSummary(filters);
@@ -460,7 +490,8 @@ function updateSearchStatus() {
     : state === 'loading' ? `Searching…${progress}`
     : searchResult?.error ? 'Press Search to retry.'
     : searchResult?.reason === 'cancelled' ? 'Search cancelled. Press Search to try again.'
-    : searchResult ? 'Results match your filters.' : 'Up to 50 matching courses per search.';
+    : '';
+  $('#checked').hidden = status.textContent !== '';
 }
 const shortDate = date => new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 function checkedText(iso) {
@@ -733,7 +764,7 @@ showThemeButton();
 
 $('#types').innerHTML = FILTER_TYPES.map(([raw, short]) =>
   `<label class="chip ${typeClass(raw)}" data-tip="${esc(filterTypeTip(raw))}"><input type="checkbox" name="types" value="${esc(short)}"><span>${esc(short)}</span></label>`).join('');
-form.elements.lang.innerHTML = '<option value="">any</option>'
+form.elements.lang.innerHTML = '<option value="">Any language</option>'
   + LANGUAGES.map(([code, name]) => `<option value="${esc(code)}">${esc(name)}</option>`).join('');
 setFilters(fromFragment());
 updateSearchStatus();

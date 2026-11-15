@@ -87,8 +87,10 @@ async function main() {
       assert.equal(await page.locator('#filter-summary [data-filter=where]').innerText(), 'Everywhere');
       assert.equal(await page.locator('#filter-summary [data-filter=from]').innerText(), 'From Nov 14, 2026');
       assert.equal(await page.locator('#filter-summary [data-filter=types]').innerText(), 'All courses');
-      assert.ok((await page.locator('.bar').boundingBox()).height < expandedHeight - 40);
-      await expandFilters();
+      assert.ok((await page.locator('.bar').boundingBox()).height < expandedHeight - 20);
+      await page.locator('#filter-summary [data-filter=types]').click();
+      await page.waitForFunction(() => !document.querySelector('#filter-panel').hasAttribute('data-animating'));
+      assert.equal(await page.locator('#filter-toggle').getAttribute('aria-expanded'), 'true', 'clicking the collapsed bar reopens the filters');
     });
     const baselineIDs = await rowIDs();
     const { normalize } = await import('../../worker/normalize.js');
@@ -136,11 +138,19 @@ async function main() {
         const cells = [...row.children].map(el => el.getBoundingClientRect());
         return cells.every(r => Math.abs(r.top + r.height / 2 - cells[0].top - cells[0].height / 2) < 1);
       })), 'desktop controls share their requested rows');
-      assert.ok(await page.locator('#filter-controls').evaluate(el => {
-        const search = el.querySelector('#search').getBoundingClientRect();
-        const text = el.querySelector('#search-status').getBoundingClientRect();
-        return Math.abs(search.right - el.getBoundingClientRect().right) < 1 && text.right <= search.left;
-      }), 'Search is right aligned with its text on the left');
+      assert.ok(await page.locator('#filters').evaluate(form => {
+        const box = sel => form.querySelector(sel).getBoundingClientRect();
+        const middle = r => r.top + r.height / 2, row = box('.filter-main');
+        return ['.brand', '#filter-toggle', '#theme'].every(sel => Math.abs(middle(box(sel)) - middle(row)) < 1)
+          && box('.brand').right <= box('.where-box').left && box('#search').right <= box('#filter-toggle').left;
+      }), 'the wheel, Search and tools share the first row');
+      assert.equal(await page.locator('.summary #search-status').count(), 1, 'status text sits on the results line');
+      assert.equal(await page.locator('#types .chip.long span').evaluateAll(spans => new Set(spans.map(span => getComputedStyle(span).backgroundColor)).size), 1, 'filter chips keep one color per group');
+      assert.ok(await page.locator('.row[data-id] .type-code').evaluateAll(badges => {
+        const colors = new Map(badges.map(badge => [badge.textContent, getComputedStyle(badge).backgroundColor]));
+        return colors.size >= 6 && new Set(colors.values()).size === colors.size;
+      }), 'each course type has its own badge color in the results');
+      assert.equal(await page.locator('#lang-code').innerText(), '');
       if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-expanded.png') });
     });
 
@@ -456,6 +466,7 @@ async function main() {
     await check('old language names restore ISO codes and empty results are clear', async () => {
       await load('lang=English&where=sublocation_2156');
       assert.equal(await page.locator('[name=lang]').inputValue(), 'en');
+      assert.equal(await page.locator('#lang-code').innerText(), 'en');
       assert.equal(await page.locator('.row[data-id]').count(), 0);
       assert.match(await page.locator('#list .empty').innerText(), /No courses/);
       assert.match(await page.locator('#checked').innerText(), /Checked/);

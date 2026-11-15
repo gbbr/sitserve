@@ -1,0 +1,12 @@
+{
+  "source": "https://design-standards.dhamma.org/dist/dhamma-wheel.svg",
+  "downloaded": "2026-11-15",
+  "images": {
+    "dhamma-wheel.svg": {
+      "use": "header logo",
+      "sourceSha256": "20d6e5fc175fbf54d88cf094ee429dc272a119bbed6aa2b3603354c9e08931f6",
+      "change": "added viewBox=\"0 0 70 100\" so the image scales in every browser",
+      "sha256": "0b9bb8882ef01c7b0e88e003a4880707ad15eab3946bff0b0ebf8f605aef147c"
+    }
+  }
+}
