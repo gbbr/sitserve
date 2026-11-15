@@ -28,6 +28,12 @@ test('out-of-scope courses dropped; unsafe URLs dropped', () => {
   assert.equal(c.apply, ''); assert.equal(c.loc.web, '');
   assert.equal(photoPath('https://evil.invalid/assets/a.png'), ''); assert.equal(photoPath('/assets/../evil.jpg'), '');
 });
+test('a venue image the proxy cannot serve falls back to the location photo', () => {
+  const photo = sub_loc_image => normalize({ ...rawTemplate, location: { ...rawTemplate.location, header_image_path: '/system/images/centers/santosa.jpg', sub_loc_image } }).loc.photo;
+  assert.equal(photo('/images/sub_location_images/EBVH.jpg?1718670010'), '/photo/system/images/centers/santosa.jpg');
+  assert.equal(photo('/system/images/venues/ebvh.jpg'), '/photo/system/images/venues/ebvh.jpg');
+  assert.equal(photo(null), '/photo/system/images/centers/santosa.jpg');
+});
 for (const html of [
   '<img src=x onerror=alert(1)><p onclick=alert(1)>ok</p>', '<script>alert(1)</script><style>body{}</style>',
   '<a href="javascript:alert(1)">x</a>', '<a href="jav&#x61;script:alert(1)">x</a>', '<a href="java&#10;script:alert(1)">x</a>',

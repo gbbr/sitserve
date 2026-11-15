@@ -66,7 +66,8 @@ export function normalize(c) {
       // dhamma.org reports every course at a venue as non-center; a venue that names a center is one.
       state: l.state || '', country: l.country || '', center: l.center_noncenter === 'center' || venueCenters(l.sub_location).length > 0,
       cc: l.country_iso_code, place: l.city_province_country, venue: l.sub_location || '', venueUrl: safeURL(l.sub_location_url),
-      photo: photoPath(l.sub_loc_image || l.header_image_path),
+      // A venue image outside the proxied paths (dhamma.org keeps them under /images/) falls back to the location's photo.
+      photo: photoPath(l.sub_loc_image) || photoPath(l.header_image_path),
       web: safeURL(l.website_url), schedule: safeURL(l.schedule_url),
     },
   };
