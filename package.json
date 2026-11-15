@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "dev:live": "node scripts/dev.js --live",
+    "deploy": "WRANGLER_SEND_METRICS=false wrangler deploy --env production",
     "test": "node --import ./worker/test/setup.js --test worker/test/*.test.js worker/test/integration.cjs",
     "test:worker": "node --import ./worker/test/setup.js --test worker/test/integration.cjs",
     "test:browser": "NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/test-browser.cjs"

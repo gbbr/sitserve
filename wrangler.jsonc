@@ -4,7 +4,10 @@
   "main": "worker/index.js",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["enable_request_signal", "request_signal_passthrough"],
+  // Cloudflare Access guards only the custom domain; no workers.dev or preview URL may bypass it.
   "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
   "assets": {
     "directory": "web",
     "binding": "ASSETS",
@@ -20,7 +23,8 @@
   },
   "env": {
     "production": {
-      "vars": { "UPSTREAM": "live", "SITE_URL": "https://sitserve.example", "UPSTREAM_SPACING_MS": "1500" },
+      "routes": [{ "pattern": "os.sutamaya.org", "custom_domain": true }],
+      "vars": { "UPSTREAM": "live", "SITE_URL": "https://os.sutamaya.org", "UPSTREAM_SPACING_MS": "1500" },
       "durable_objects": { "bindings": [{ "name": "UPSTREAM_GATE", "class_name": "UpstreamDurableObject" }] }
     }
   }

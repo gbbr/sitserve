@@ -106,8 +106,9 @@ upstream request.
 
 ## Audience
 
-sitserve is for private use by a few invited people. Access must be restricted (for example with
-Cloudflare Access) so nobody else spends the allowance. Before opening it up, write to dhamma.org's
+sitserve is for private use by a few invited people. It runs at https://os.sutamaya.org behind
+Cloudflare Access, which admits only listed email addresses, so nobody else spends the allowance.
+Before opening it up, write to dhamma.org's
 webmasters about the limits and date cursor. If they object to the cursor, stop at their 100-course
 limit and show partial results.
 
@@ -145,7 +146,7 @@ Environment controls (set before `npm run dev`, or as Wrangler vars):
   `UPSTREAM_TIMEOUT_MS`, `UPSTREAM_SLOW_MS` tune the gate.
 
 `npm run dev:live` prints a warning and explicitly selects live mode. It needs `UPSTREAM_CONTACT`
-in ignored `.dev.vars`; production uses a secret. Set `SITE_URL` to the real site before deployment.
+in ignored `.dev.vars`; production uses a Worker secret.
 The production environment uses live mode; ordinary dev and every test use the simulator.
 
 Regenerate place metadata from saved files, without network access:
@@ -162,8 +163,14 @@ and extracts the oracle. Safe URL canonicalization, sanitized comments, proxied 
 venue URLs and centers at venues that name one are the intentional normalization differences.
 Countries without a saved flag use a text fallback; no flag or photo is downloaded during development.
 
-## Deployment and tuning remain
+## Deployment
 
-Set a real domain/SITE_URL, configure secrets and access restriction, then deploy. Tune spacing,
-allowances, timeout and slow thresholds from logs. Decide metadata refresh cadence. Production
-deployment and live upstream verification are separate from local development.
+`npm run deploy` deploys the `production` environment: live mode on the Worker custom domain
+`os.sutamaya.org`, with Workers Logs enabled and no workers.dev or preview URLs. A Cloudflare
+Access application for that hostname (Zero Trust dashboard, not this repository) admits only
+listed email addresses; its login methods are set there too. `UPSTREAM_CONTACT` is a Worker secret
+(`wrangler secret put UPSTREAM_CONTACT --env production`). Production deployment and live
+upstream verification are separate from local development.
+
+Still to do: tune spacing, allowances, timeout and slow thresholds from logs, and decide the
+metadata refresh cadence.
