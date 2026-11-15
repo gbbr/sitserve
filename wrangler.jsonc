@@ -25,7 +25,7 @@
     "production": {
       "main": "worker/index.js",
       "routes": [{ "pattern": "os.sutamaya.org", "custom_domain": true }],
-      "vars": { "UPSTREAM": "live", "SITE_URL": "https://os.sutamaya.org", "UPSTREAM_SPACING_MS": "1500" },
+      "vars": { "UPSTREAM": "live", "SIMULATOR_DATE_SHIFT": "0", "SITE_URL": "https://os.sutamaya.org", "UPSTREAM_SPACING_MS": "1500" },
       "durable_objects": { "bindings": [{ "name": "UPSTREAM_GATE", "class_name": "UpstreamDurableObject" }] }
     }
   }
