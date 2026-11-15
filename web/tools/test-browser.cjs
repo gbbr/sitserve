@@ -293,6 +293,21 @@ async function main() {
       assert.equal(await page.locator('[name=where]').inputValue(), 'location_1542');
     });
 
+    await check('place picker holds at most ten places', async () => {
+      const { places, MAX_PLACES } = await import('../shared/courses.js');
+      const keys = places.slice(0, MAX_PLACES + 1).map(p => p.key);
+      await load('where=' + keys.join(','));
+      assert.equal(await page.locator('[name=where]').inputValue(), keys.slice(0, MAX_PLACES).join(','));
+      await search.fill('dhara');
+      assert.equal(await page.locator('#place-options [role=option]').count(), 0);
+      assert.equal(await page.locator('#place-options').innerText(), 'Up to 10 places. Remove one to add another.');
+      assert.equal(await page.locator('#place-status').textContent(), 'Up to 10 places. Remove one to add another.');
+      await search.fill('');
+      await search.press('Backspace');
+      await pick('dhara', 'location_1542');
+      assert.equal(await page.locator('[name=where]').inputValue(), [...keys.slice(0, MAX_PLACES - 1), 'location_1542'].join(','));
+    });
+
     await check('place picker keyboard navigation, removal and focus', async () => {
       await load();
       await search.focus();

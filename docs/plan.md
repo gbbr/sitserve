@@ -16,9 +16,10 @@ not propagate HTTP disconnects. Cancellation is scoped to the visitor IP and sea
 
 `GET /api/search` takes the same parameters as the page fragment: `where`, `from`, `types`, `as`,
 `lang` (ISO code), `centers`, `wait`, `soon`. Booleans are `1`/`0`. Unknown/duplicate places are
-removed. Old language names and `types=14D` / `TSC` restore their current equivalents. Invalid
-API parameters return 400 JSON. From is clamped to yesterday using UTC; `SITSERVE_TODAY` fixes
-the server date for tests. The upstream end date is Dec 31 of the current UTC year plus two.
+removed; more than 10 remaining places are invalid (links keep the first 10). Old language names
+and `types=14D` / `TSC` restore their current equivalents. Invalid API parameters return 400
+JSON. From is clamped to yesterday using UTC; `SITSERVE_TODAY` fixes the server date for tests.
+The upstream end date is Dec 31 of the current UTC year plus two.
 
 Responses are NDJSON with `Cache-Control: no-store`:
 
@@ -86,11 +87,12 @@ There is no background refresh, bulk course index or cache warming.
 - Rolling hourly allowances: 100 search requests and a separate 60 photos. Timestamps persist.
   Spent allowances permit cached data and stop at the first uncached page.
 - One active search per IP; at most three searches needing uncached pages per rolling minute.
-- 429, 5xx, non-JSON, malformed JSON/envelopes, timeout, slow responses and transport failures
-  pause upstream requests for five minutes, or a longer Retry-After, capped at one hour. The pause
-  persists; cached pages and photos remain available. Valid slow responses are cached and returned
-  before further uncached requests pause. Invalid individual courses are skipped and logged;
-  they do not pause the gate. There are **no automatic retries**.
+- Any unsuccessful status (429, 5xx, other 4xx, redirects), non-JSON, malformed JSON/envelopes,
+  timeout, slow responses and transport failures pause upstream requests for five minutes, or a
+  longer Retry-After, capped at one hour. The pause persists; cached pages and photos remain
+  available. Valid slow responses are cached and returned before further uncached requests pause.
+  Invalid individual courses are skipped and logged; they do not pause the gate. There are
+  **no automatic retries**.
 - Default timeout: 20 s; slow threshold: over 10 s. Request logs include rolling hourly counts.
   A persisted per-UTC-day count of started page and photo requests feeds `usage`.
 - Identity: `sitserve/<version> (+<SITE_URL>; <UPSTREAM_CONTACT>)`. Redirects are not followed.
@@ -98,7 +100,9 @@ There is no background refresh, bulk course index or cache warming.
 
 `GET /photo/system/images/...` and `/photo/assets/...` accept image paths only. Live photos use
 the same queue, identity and breaker, are stored for seven days, and receive a one-day browser
-cache lifetime. Simulator photos are generated SVG placeholders with no upstream request.
+cache lifetime. A photo answering 404/410 or larger than 2 MB is stored as missing for a day and
+returns 404, without pausing the gate. Simulator photos are generated SVG placeholders with no
+upstream request.
 
 ## Audience
 

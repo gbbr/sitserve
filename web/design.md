@@ -255,6 +255,8 @@ codes such as "WA" or "IN".
 - With nothing typed, the suggestions are the continents.
 - Already-selected places are excluded from suggestions. Select a place, then submit Search
   to apply it to courses. A clear empty state appears when no suggestions match.
+- A search takes up to 10 places. With 10 chosen, the list shows "Up to 10 places. Remove one
+  to add another." instead of suggestions.
 
 **Using it:**
 - Keyboard: the arrows move through suggestions, Enter picks one, Escape closes the list, and
@@ -263,7 +265,7 @@ codes such as "WA" or "IN".
 - Clicking outside or tabbing away closes the suggestions. The input exposes combobox/listbox
   semantics and the active option, and result counts are announced to assistive technology.
 - Store selected keys (`region_402,location_1542,…`) in the hidden `where` value and, on Search,
-  the URL fragment. Remove duplicate and unknown keys when restoring a link.
+  the URL fragment. Remove duplicate and unknown keys when restoring a link, then keep the first 10.
 - Places combine with OR: courses in any selected place show. Region membership uses
   `LOCATION_REGIONS[loc.id]`; states compare both state and country; locations and venues use
   `loc.id` and `loc.subId` respectively. The data lives in `PLACES`, `LOCATION_REGIONS`, and the

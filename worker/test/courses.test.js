@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { availability, lights, matches, filterDefaults, parseFilters, serializeFilters, KEYS, COVERS, TYPE, FILTER_TYPES, typeClass } from '../../web/shared/courses.js';
+import { availability, lights, matches, filterDefaults, parseFilters, serializeFilters, KEYS, COVERS, TYPE, FILTER_TYPES, typeClass, places, MAX_PLACES } from '../../web/shared/courses.js';
 import { template, fixture } from './helpers.js';
 const today = '2026-11-14', f = filterDefaults(today), course = { ...template, start: '2026-11-20', enroll: '2026-01-01' };
 for (const [type, covers] of [[null, KEYS], ...Object.entries(COVERS)]) test(`status coverage ${type}`, () => {
@@ -53,6 +53,12 @@ test('fragment and query round trips; legacy language and gratitude; unknown pla
   assert.equal(parseFilters('types=BAD&as=wat&from=bad&lang=unknown',{ today }).from,today);
 });
 for (const query of ['from=2026-02-30','as=BAD','types=Other','wait=true','lang=ZZ','bad=1','as=OM&as=NM']) test(`invalid API filters: ${query}`, () => assert.throws(() => parseFilters(query,{ today,strict:true })));
+test('a search takes at most MAX_PLACES places; the API rejects more and links keep the first ones', () => {
+  const keys = places.slice(0, MAX_PLACES + 1).map(p => p.key), first = keys.slice(0, MAX_PLACES).join(',');
+  assert.equal(parseFilters('where=' + first, { today, strict: true }).where, first);
+  assert.throws(() => parseFilters('where=' + keys.join(','), { today, strict: true }), /Too many places/);
+  assert.equal(parseFilters('#where=' + keys.join(','), { today }).where, first);
+});
 test('course chip groups and order are stable', () => {
   assert.deepEqual(FILTER_TYPES.map(([,c])=>c),['3D','10D','10D OS','EXEC','STP','14D/TSC','10D SPCL','20D','30D','45D','60D']);
   assert.equal(typeClass('TSC'),'special'); assert.equal(typeClass('60-DayOSC'),'long');

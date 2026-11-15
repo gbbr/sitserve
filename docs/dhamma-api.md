@@ -228,7 +228,8 @@ has the same information as structured data.
 `X-Requested-With: XMLHttpRequest`. Live identity is
 `sitserve/<version> (+<SITE_URL>; <UPSTREAM_CONTACT>)`; missing contact prevents all live requests.
 Redirects are not followed. The client validates page/course fields and classifies throttling,
-5xx, challenges/non-JSON, malformed JSON/envelopes, timeout and slow responses, without retries.
+5xx, other unsuccessful statuses and redirects, challenges/non-JSON, malformed JSON/envelopes,
+timeout and slow responses, without retries.
 Invalid individual courses are skipped and logged. Valid slow responses are cached and returned
 while further uncached requests pause.
 

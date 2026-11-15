@@ -98,6 +98,8 @@ export function matches(c, f) {
     && (!f.lang || c.langs.includes(languageNames.get(f.lang)))
     && (!f.where || f.where.split(',').some(k => placeByKey.has(k) && placeMatches(c, placeByKey.get(k))));
 }
+// The most places one search combines; each is sent upstream and compared with cached queries.
+export const MAX_PLACES = 10;
 export const filterDefaults = (today = utcToday()) => ({ where: '', from: today, types: '', as: 'any', lang: '', centers: false, wait: true, soon: true });
 export const validDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
 export function parseFilters(input = '', { today = utcToday(), strict = false } = {}) {
@@ -123,7 +125,9 @@ export function parseFilters(input = '', { today = utcToday(), strict = false } 
   const codes = new Set(f.types.split(',').filter(Boolean).map(c => ['14D', 'TSC'].includes(c) ? '14D/TSC' : c));
   for (const c of codes) if (!FILTER_TYPES.some(([, code]) => c === code)) fail(`Unknown course type: ${c}`);
   f.types = FILTER_TYPES.map(([, code]) => code).filter(code => codes.has(code)).join(',');
-  f.where = [...new Set(f.where.split(',').filter(k => placeByKey.has(k)))].join(',');
+  const where = [...new Set(f.where.split(',').filter(k => placeByKey.has(k)))];
+  if (where.length > MAX_PLACES) fail(`Too many places (at most ${MAX_PLACES})`);
+  f.where = where.slice(0, MAX_PLACES).join(',');
   return f;
 }
 export function serializeFilters(f, { today = utcToday(), includeDefaults = false } = {}) {

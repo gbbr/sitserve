@@ -1,11 +1,11 @@
-import { buildRequest, getDhammaPage, timedRequest, UpstreamError } from './dhamma.js';
+import { buildRequest, getDhammaPage, readResponse, timedRequest, UpstreamError } from './dhamma.js';
 import { normalizePage, escapeHTML, validPhotoPath } from './normalize.js';
 import { createSimulator } from './simulator.js';
 import { parseFilters } from '../web/shared/courses.js';
 import { QueryIndex, queryParams } from './query-cache.js';
 import { search, serverToday } from './search.js';
 const HOUR = 3600000, DAY = 24 * HOUR;
-const BREAKS = new Set(['429', '5xx', 'non-json', 'malformed', 'slow', 'timeout', 'network']);
+const BREAKS = new Set(['429', '5xx', 'http', 'non-json', 'malformed', 'slow', 'timeout', 'network']);
 export const CACHE_SCHEMA = 3;
 export async function cacheKey(kind, params, namespace = 'simulator') {
   const bytes = new TextEncoder().encode(JSON.stringify([CACHE_SCHEMA, namespace, kind, params]));
@@ -207,7 +207,9 @@ export class UpstreamGate {
     if (this.env.UPSTREAM !== 'live') return { type: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="284" height="200" viewBox="0 0 284 200"><rect width="284" height="200" fill="#e8edf0"/><text x="142" y="90" text-anchor="middle" fill="#586171" font-family="sans-serif" font-size="13">simulated photo</text><text x="142" y="115" text-anchor="middle" fill="#586171" font-family="sans-serif" font-size="10">${escapeHTML(path.split('/').at(-1))}</text></svg>` };
     await this.ready;
     const key = await cacheKey('photo', path, 'live');
+    const missing = () => new UpstreamError('missing', 'Photo not found.');
     const read = async hit => {
+      if (hit.missing) throw missing();
       const chunks = await Promise.all(Array.from({ length: hit.chunks }, (_, i) => this.storage.get(`${key}:${i}`)));
       const body = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
       let offset = 0; for (const c of chunks) { body.set(new Uint8Array(c), offset); offset += c.byteLength; }
@@ -219,17 +221,18 @@ export class UpstreamGate {
       const value = await timedRequest(new Request('https://www.dhamma.org' + path, { redirect: 'manual', headers: { 'User-Agent': identity, Accept: 'image/*' } }), {
         fetch: this.fetch, clock: this.clock, timers: this.timers, timeout: +(this.env.UPSTREAM_TIMEOUT_MS || 20000), slow: +(this.env.UPSTREAM_SLOW_MS || 10000),
         onSlow: elapsed => this.slowResponse(elapsed),
+        // A photo that is gone or too large is one photo's problem: it is remembered as missing
+        // for a day and does not pause the gate. Other unsuccessful statuses reject with their breaker code.
         decode: async r => {
-          if (r.status === 429 || r.status >= 500) {
-            const { readResponse } = await import('./dhamma.js'); await readResponse(r, this.clock);
-          }
-          if (!r.ok || !/^image\/(?:jpeg|png|gif|webp|avif|svg\+xml)(?:;|$)/i.test(r.headers.get('Content-Type') || ''))
+          if (r.status === 404 || r.status === 410) return null;
+          if (!r.ok) await readResponse(r, this.clock);
+          if (!/^image\/(?:jpeg|png|gif|webp|avif|svg\+xml)(?:;|$)/i.test(r.headers.get('Content-Type') || ''))
             throw new UpstreamError('non-json', 'Upstream returned an invalid photo.');
           const body = await r.arrayBuffer();
-          if (body.byteLength > 2 * 1024 * 1024) throw new UpstreamError('malformed', 'Upstream photo is too large.');
-          return { type: r.headers.get('Content-Type'), body };
+          return body.byteLength > 2 * 1024 * 1024 ? null : { type: r.headers.get('Content-Type'), body };
         },
       });
+      if (!value) { await this.put(key, { missing: true, expiresAt: this.clock() + DAY }); throw missing(); }
       const chunks = Math.ceil(value.body.byteLength / 65536);
       for (let i = 0; i < chunks; i++) await this.storage.put(`${key}:${i}`, value.body.slice(i * 65536, (i + 1) * 65536));
       await this.put(key, { chunks, type: value.type, expiresAt: this.clock() + 7 * DAY });
@@ -259,7 +262,7 @@ export class UpstreamDurableObject {
       try {
         const photo = await this.gate.photo(url.pathname.slice('/photo'.length));
         return new Response(photo.body, { headers: { 'Content-Type': photo.type, 'Cache-Control': 'public, max-age=86400', 'Content-Security-Policy': "default-src 'none'; sandbox" } });
-      } catch (e) { return Response.json({ code: e.code, message: e.message }, { status: e.code === 'path' ? 400 : 503 }); }
+      } catch (e) { return Response.json({ code: e.code, message: e.message }, { status: { path: 400, missing: 404 }[e.code] || 503 }); }
     }
     let filters;
     try { filters = parseFilters(url.searchParams, { today: serverToday(this.env), strict: true }); }

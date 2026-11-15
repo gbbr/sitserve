@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { UpstreamGate } from '../upstream.js';
+import { UpstreamGate, UpstreamDurableObject } from '../upstream.js';
 import { requestParams } from '../dhamma.js';
 import { filterDefaults } from '../../web/shared/courses.js';
 import { FakeClock, MemoryStorage, fixture, until, tick } from './helpers.js';
@@ -59,12 +59,13 @@ test('three uncached searches per minute per IP; cached-only searches free',asyn
   await b.getPage({...params,page:7},b.beginSearch('b'));
   await a.clock.advance(60000);await b.getPage({...params,page:8},b.beginSearch('a'));assert.equal(a.calls,8);
 });
-for(const code of ['429','5xx','non-json','malformed','timeout','network']) test(`breaker persists for ${code}, caches still served, no retry`,async()=>{
+for(const code of ['429','5xx','http','non-json','malformed','timeout','network']) test(`breaker persists for ${code}, caches still served, no retry`,async()=>{
   let fail=false;const clock=new FakeClock();
   const a=make({clock,env:{UPSTREAM_TIMEOUT_MS:'20',UPSTREAM_SLOW_MS:'10'},fetch:async()=>{
     if(!fail)return Response.json(raw);
     if(code==='429')return new Response('',{status:429,headers:{'Retry-After':'900'}});
     if(code==='5xx')return new Response('',{status:503});
+    if(code==='http')return new Response('<html>blocked</html>',{status:403,headers:{'Content-Type':'text/html'}});
     if(code==='non-json')return new Response('<html>challenge</html>',{headers:{'Content-Type':'text/html'}});
     if(code==='malformed')return Response.json({});
     if(code==='timeout')return new Promise(()=>{});
@@ -196,4 +197,33 @@ test('slow valid photos are returned and persisted while the shared gate pauses'
   const restarted = new UpstreamGate(a.options);
   assert.deepEqual((await restarted.photo(path)).body, new Uint8Array([1, 2, 3]));
   await assert.rejects(restarted.photo('/assets/other.png'), e => e.code === 'paused'); assert.equal(a.calls, 1);
+});
+test('redirects and other unsuccessful statuses pause pages and photos', async () => {
+  for (const [status, photo] of [[302, false], [404, false], [301, true], [403, true]]) {
+    const a = make({ env: { UPSTREAM: 'live', UPSTREAM_CONTACT: 'test@example.invalid' },
+      fetch: async () => new Response('', { status, headers: { Location: 'https://www.dhamma.org/challenge' } }) });
+    await assert.rejects(photo ? a.gate.photo('/assets/a.png') : a.gate.getPage(params), e => e.code === 'http');
+    assert.equal(a.gate.meta.pausedUntil - a.clock.now, 300000, `${status} ${photo ? 'photo' : 'page'}`);
+  }
+});
+test('a missing or oversized photo is remembered for a day without pausing the gate', async () => {
+  const a = make({ env: { UPSTREAM: 'live', UPSTREAM_CONTACT: 'test@example.invalid' }, fetch: async r => {
+    if (r.url.endsWith('/do_search')) return Response.json(raw);
+    if (r.url.endsWith('/large.png')) return new Response(new Uint8Array(2 * 1024 * 1024 + 1), { headers: { 'Content-Type': 'image/png' } });
+    return new Response('Not found', { status: r.url.endsWith('/gone.png') ? 410 : 404, headers: { 'Content-Type': 'text/html' } });
+  } });
+  for (const path of ['/assets/missing.png', '/assets/gone.png', '/assets/large.png'])
+    await assert.rejects(a.gate.photo(path), e => e.code === 'missing', path);
+  assert.equal(a.gate.meta.pausedUntil, 0); assert.equal((await a.gate.getPage(params)).cacheHit, false);
+  const restarted = new UpstreamGate(a.options);
+  await assert.rejects(restarted.photo('/assets/missing.png'), e => e.code === 'missing'); assert.equal(a.calls, 4);
+  await a.clock.advance(24 * 3600000);
+  await assert.rejects(restarted.photo('/assets/missing.png'), e => e.code === 'missing'); assert.equal(a.calls, 5);
+});
+test('the photo route answers 404 for a missing photo', async () => {
+  const object = new UpstreamDurableObject({ storage: new MemoryStorage() }, { UPSTREAM: 'live', UPSTREAM_CONTACT: 'test@example.invalid', UPSTREAM_SPACING_MS: '0' });
+  let calls = 0;
+  object.gate.log = () => {}; object.gate.fetch = async () => { calls++; return new Response('', { status: 404 }); };
+  for (let i = 0; i < 2; i++) assert.equal((await object.fetch(new Request('https://sitserve.test/photo/assets/missing.png'))).status, 404);
+  assert.equal(calls, 1);
 });

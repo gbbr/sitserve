@@ -1,7 +1,7 @@
 import { LANGUAGES } from './places.js';
 import { COLUMNS, GROUPS, KEYS, COLUMN_NAME, LIGHTS, TYPE, TYPES, FILTER_TYPES,
   typeClass, typeTip, filterTypeTip, filterDuration, fold, places, placeByKey, lights, availability,
-  filterDefaults, parseFilters, serializeFilters } from './shared/courses.js';
+  filterDefaults, parseFilters, serializeFilters, MAX_PLACES } from './shared/courses.js';
 
 'use strict';
 
@@ -56,6 +56,7 @@ const PLACE_GROUPS = [
   ['region', 'Regions'], ['state', 'States and provinces'],
   ['location', 'Centers and non-centers'], ['sublocation', 'Venues'],
 ];
+const PLACES_FULL = `Up to ${MAX_PLACES} places. Remove one to add another.`;
 let suggestions = [], activePlace = -1;
 
 function chosenPlaces() {
@@ -122,8 +123,8 @@ function activatePlace(index, scroll = false) {
 
 function showPlaces() {
   const query = fold(placeInput.value.trim()), words = query.split(/\s+/).filter(Boolean);
-  const chosen = new Set(chosenPlaces().map(p => p.key));
-  const ranked = places.filter(p => !chosen.has(p.key) && (words.length || p.tag === 'continent'))
+  const chosen = new Set(chosenPlaces().map(p => p.key)), full = chosen.size >= MAX_PLACES;
+  const ranked = places.filter(p => !full && !chosen.has(p.key) && (words.length || p.tag === 'continent'))
     .map(p => ({ p, rank: words.length ? placeRank(p, query, words) : 0 }))
     .filter(item => Number.isFinite(item.rank))
     .sort((a, b) => a.rank - b.rank || (a.p.kind === 'region' ? 0 : 1) - (b.p.kind === 'region' ? 0 : 1)
@@ -137,13 +138,13 @@ function showPlaces() {
       return `<div class="place-option" id="place-option-${p.key}" role="option" aria-selected="false" data-index="${index}"><span>${highlightPlace(p.text, words)}</span><span class="place-tag">${esc(p.tag)}${p.kind === 'region' ? `<br>${p.count} location${p.count === 1 ? '' : 's'}` : ''}</span></div>`;
     }).join('');
     return `<div role="group" aria-label="${label}"><div class="place-group" aria-hidden="true">${label}</div>${options}${group.length > 8 ? `<div class="place-more">${group.length - 8} more — keep typing</div>` : ''}</div>`;
-  }).join('') || '<div class="place-empty">No matching places.</div>';
+  }).join('') || `<div class="place-empty">${full ? PLACES_FULL : 'No matching places.'}</div>`;
   placeOptions.hidden = false;
   placeInput.setAttribute('aria-expanded', 'true');
   activatePlace(suggestions.length ? 0 : -1);
   const r = $('#where-box').getBoundingClientRect();
   placeOptions.style.left = Math.min(0, innerWidth - r.left - placeOptions.offsetWidth - 16) + 'px';
-  $('#place-status').textContent = `${ranked.length} place${ranked.length === 1 ? '' : 's'} found${ranked.length > suggestions.length ? `, ${suggestions.length} shown. Keep typing to narrow the list` : ''}.`;
+  $('#place-status').textContent = full ? PLACES_FULL : `${ranked.length} place${ranked.length === 1 ? '' : 's'} found${ranked.length > suggestions.length ? `, ${suggestions.length} shown. Keep typing to narrow the list` : ''}.`;
 }
 
 function closePlaces() {
