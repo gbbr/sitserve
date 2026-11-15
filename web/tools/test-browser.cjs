@@ -57,7 +57,7 @@ async function main() {
     await check('page load waits for an explicit Search', async () => {
       await page.goto(url);
       assert.equal(await page.locator('.row[data-id]').count(), 0);
-      assert.equal(await page.locator('.summary').isVisible(), false);
+      assert.equal(await page.locator('.search-state').isVisible(), false);
       assert.equal(await page.locator('footer').isVisible(), false);
       assert.equal(await page.locator('#list').innerText(), 'Choose your filters and press Search to find up to 50 matching courses.');
       assert.match(await page.locator('#list').innerText(), /press Search/);
@@ -79,8 +79,9 @@ async function main() {
       });
       await page.waitForFunction(() => document.querySelector('#filter-controls').hidden);
       assert.equal(await page.locator('#filter-controls').isVisible(), false);
-      assert.ok(await page.locator('.summary').isVisible());
       assert.ok(await page.locator('footer').isVisible());
+      assert.match(await page.locator('footer #checked').innerText(), /^Checked/);
+      assert.equal(await page.locator('.search-state').isVisible(), false, 'a finished search has no status line');
       assert.match(await page.locator('#usage').innerText(), /^Simulated requests today \(UTC\): \d+ pages?, 0 photos$/);
       assert.equal(await page.locator('#search').isVisible(), false);
       assert.equal(await page.locator('#filter-toggle').getAttribute('aria-label'), 'Edit filters');
@@ -135,7 +136,7 @@ async function main() {
       })));
       assert.ok(await page.locator('.type').first().evaluate(el => getComputedStyle(el).justifyContent === 'center'));
       assert.ok(await page.locator('.filter-row').evaluateAll(rows => rows.every(row => {
-        const cells = [...row.children].map(el => el.getBoundingClientRect());
+        const cells = [...row.children].filter(el => !el.hidden).map(el => el.getBoundingClientRect());
         return cells.every(r => Math.abs(r.top + r.height / 2 - cells[0].top - cells[0].height / 2) < 1);
       })), 'desktop controls share their requested rows');
       assert.ok(await page.locator('#filters').evaluate(form => {
@@ -144,7 +145,7 @@ async function main() {
         return ['.brand', '#filter-toggle', '#theme'].every(sel => Math.abs(middle(box(sel)) - middle(row)) < 1)
           && box('.brand').right <= box('.where-box').left && box('#search').right <= box('#filter-toggle').left;
       }), 'the wheel, Search and tools share the first row');
-      assert.equal(await page.locator('.summary #search-status').count(), 1, 'status text sits on the results line');
+      assert.equal(await page.locator('#filter-controls #search-status').count(), 1, 'status text sits by the Search button');
       assert.equal(await page.locator('#types .chip.long span').evaluateAll(spans => new Set(spans.map(span => getComputedStyle(span).backgroundColor)).size), 1, 'filter chips keep one color per group');
       assert.ok(await page.locator('.row[data-id] .type-code').evaluateAll(badges => {
         const colors = new Map(badges.map(badge => [badge.textContent, getComputedStyle(badge).backgroundColor]));
@@ -417,6 +418,65 @@ async function main() {
       }));
     });
 
+    await check('phone rows take two lines and the collapsed summary wraps after the wheel', async () => {
+      await page.setViewportSize({ width: 360, height: 800 });
+      await load('from=2027-01-10&types=20D,30D,45D,60D,10D%20SPCL');
+      const rows = await page.evaluate(() => [...document.querySelectorAll('.row[data-id]')].map(row => {
+        const box = k => row.querySelector(`[data-column=${k}]`).getBoundingClientRect();
+        const spread = boxes => Math.max(...boxes.map(b => b.top + b.height / 2)) - Math.min(...boxes.map(b => b.top + b.height / 2));
+        const r = row.getBoundingClientRect(), location = box('location'), links = box('links'), apply = box('apply');
+        const dates = box('dates'), type = box('type'), lights = box('lights'), soon = row.querySelector('.soon');
+        return {
+          height: r.height,
+          line1: spread([location, links, apply]),
+          line2: spread([dates, type, lights]),
+          stacked: Math.min(dates.top, type.top, lights.top) >= Math.max(location.bottom, apply.bottom) - 1,
+          applyInset: r.right - apply.right, lightsInset: r.right - lights.right, iconGap: links.left - location.right,
+          button: row.querySelector('[data-column=apply] > *').innerText,
+          soon: soon && getComputedStyle(soon).display !== 'none' ? soon.textContent : null,
+        };
+      }));
+      assert.ok(rows.length > 3 && rows.some(r => r.soon), 'fixture needs a course that is not open yet');
+      for (const r of rows) {
+        assert.ok(r.height < 70 && r.line1 < 2 && r.line2 < 2 && r.stacked, `two lines: ${JSON.stringify(r)}`);
+        assert.ok(Math.abs(r.applyInset - 12) < 1 && Math.abs(r.lightsInset - 12) < 1 && Math.abs(r.iconGap - 6) < 1, `edges: ${JSON.stringify(r)}`);
+        assert.equal(r.button, 'Apply');
+        if (r.soon) assert.match(r.soon, /^Opens \d+ [A-Z][a-z]{2}$/);
+      }
+      // The month heading's key sits over the lights' fixed slots.
+      const offsets = await page.evaluate(() => {
+        const month = document.querySelector('#list h2');
+        let row = month.nextElementSibling;
+        while (!row.matches('.row[data-id]') || row.querySelector('.soon')) row = row.nextElementSibling;
+        const centers = els => [...els].map(el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; });
+        const lights = centers(row.querySelectorAll('.lights .l'));
+        return centers(month.querySelectorAll('.key .l')).map((x, i) => Math.abs(x - lights[i]));
+      });
+      assert.equal(offsets.length, 6);
+      assert.ok(offsets.every(d => d < .5), `key offsets ${offsets}`);
+
+      await load('where=region_402&types=10D,20D,STP,3D&as=OM&lang=en&centers=1&wait=0');
+      assert.equal(await page.locator('.filter-heading').evaluate(el => el.getBoundingClientRect().height), 30, 'open filters leave no room for the summary');
+      await collapseFilters();
+      const summary = await page.evaluate(() => {
+        const brand = document.querySelector('.brand').getBoundingClientRect(), tools = document.querySelector('.filter-tools').getBoundingClientRect();
+        const s = document.querySelector('#filter-summary');
+        const tokens = [...s.querySelectorAll('.filter-token')].map(t => t.getBoundingClientRect());
+        return {
+          scroll: s.scrollWidth - s.clientWidth,
+          lines: new Set(tokens.map(t => Math.round(t.top + t.height / 2))).size,
+          afterWheel: tokens.every(t => t.left >= brand.right + 9.5),
+          inView: tokens.every(t => t.right <= innerWidth - 15.5),
+          clearOfTools: tokens.every(t => t.bottom <= tools.top || t.top >= tools.bottom || t.right <= tools.left),
+          underTools: tokens.some(t => t.top >= tools.bottom && t.right > tools.left),
+        };
+      });
+      assert.equal(summary.scroll, 0);
+      assert.ok(summary.lines > 1 && summary.afterWheel && summary.inView && summary.clearOfTools && summary.underTools, JSON.stringify(summary));
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await load();
+    });
+
     await check('sticky headers overlap without a seam and titles stay aligned', async () => {
       for (const width of [821, 1024, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
@@ -571,13 +631,13 @@ async function main() {
       await hosted({ SIMULATOR_FAULT: 'html' }, async (p, local) => {
         const submitFault = async () => { await p.locator('#search').click(); await p.waitForFunction(() => !document.querySelector('#search').disabled); };
         await submitFault();
-        assert.match(await p.locator('#search-limit').innerText(), /non-JSON/);
-        assert.match(await p.locator('#search-status').innerText(), /Search to retry/);
+        assert.match(await p.locator('#search-status').innerText(), /non-JSON.*Search to retry/);
+        assert.ok(await p.locator('#search-status').isVisible());
         assert.ok(await p.locator('#place-search').isVisible());
         await p.waitForTimeout(150);
         assert.equal((await (await fetch(local.url + '/api/debug')).json()).simulatorRequests, 1);
         await submitFault();
-        assert.match(await p.locator('#search-limit').innerText(), /paused/i);
+        assert.match(await p.locator('#search-status').innerText(), /paused/i);
         assert.equal((await (await fetch(local.url + '/api/debug')).json()).simulatorRequests, 1);
       });
     });

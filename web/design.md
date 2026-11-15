@@ -68,7 +68,8 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
   a search also keeps them open when it finishes. Page load and shared links start expanded.
   The compact summary groups neutral place pills with a location icon, a bordered date chip,
   course badges using their existing category colors, and quieter applicant/language/option
-  chips. A long summary scrolls horizontally. On phones the summary uses a second row.
+  chips. A long summary scrolls horizontally. On phones it flows after the wheel and wraps, using
+  the space beneath the filter and theme buttons from its second line.
 - **Search**: submits all filters together. No automatic search on filter changes, place
   selection, page load or URL restoration. The compact button says **Search** in its resting
   states: solid brown with a search icon before the first submission; quiet outlined with a
@@ -79,7 +80,9 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
   completed state; the button remains clickable to run the search again. While loading it keeps
   its label, so the row doesn't shift, shows a spinning icon and is disabled. Status text
   (progress through the last searched date, pending, error and cancelled messages) and a Cancel
-  link sit at the right of the results line, in place of “Checked …”. Cancel stops the stream.
+  link sit under the Search button, at the right end of the second filter row (below Search on
+  phones), and only while there's something to say. These states all keep the controls open.
+  Cancel stops the stream.
   Edits during loading preserve the submitted results and show the pending warning.
   Column reordering and theme changes preserve the submitted filters too.
 - Submitted filters live in the URL fragment, so a search can be bookmarked or shared.
@@ -93,19 +96,21 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
   opens only 2–3 months ahead. In-progress, full and closed courses never show, and there's
   no "N hidden" count.
 - **Before the first search:** below the filters, show only "Choose your filters and press
-  Search to find up to 50 matching courses." Hide the summary, legend and footer until a
-  search starts. The footer is centered when shown. Its second line shows today's (UTC) requests
-  to dhamma.org from every search's final event: "Requests to dhamma.org today (UTC): 37 pages,
-  5 photos" ("Simulated requests" in dev). It updates only when a search finishes.
-- **Summary line:** "N courses you can sign up for", plus a legend: the blue non-center dot and
-  the open / wait list / long wait list / closed lights.
+  Search to find up to 50 matching courses." Hide the footer until a search starts.
+- **No summary line:** the column headings follow the filter bar directly, and month headings
+  carry the counts. A hidden status announces "N courses you can sign up for" to screen readers.
+- **Footer**, centered: a legend (the blue non-center dot and the open / wait list / long wait
+  list / closed lights), the dhamma.org credit, then "Checked 12 min ago · Requests to
+  dhamma.org today (UTC): 37 pages, 5 photos" ("Simulated requests" in dev). The request
+  counts come from every search's final event and update only when a search finishes.
 - **Result limit:** collect up to 50 courses that pass every filter, fetching more upstream
   pages when needed and continuing past the target's 100-course query limit with a later start
   date. At 50 matches, suggest changing the filters to find others; there is no pagination or
   Load more. A search stopped early by its page cap is partial: mark it clearly ("Searched
-  through Dec 3") and suggest a later From or narrower filters. Show when the results were
-  checked ("Checked 12 min ago", in small faint text). The backend enforces the same page cap for cached and fresh
-  pages; cursor and same-date stops are also reported as partial.
+  through Dec 3") and suggest a later From or narrower filters. These notes, and "Search
+  cancelled. Results may be incomplete.", appear centered after the last row, where the results
+  stop. The backend enforces the same page cap for cached and fresh pages; cursor and same-date
+  stops are also reported as partial.
 - **Grouping:** rows are grouped by start month. The column headings stick under the filter
   bar, and the year-first month headings ("2026 NOVEMBER 63") stick under the column headings.
   Keep full month names and align these group headings to the left edge of the table, rather
@@ -126,7 +131,7 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
   1. **Location**:
      - Shows a rectangular flag, then the name without its "Dhamma " prefix. Courses away from a
        center (at a non-center or an outside venue) have a tiny faint blue dot; others have none.
-       The legend explains the non-center marker.
+       The footer legend explains the non-center marker.
      - Align the Location heading with the flag, at the left edge of the whole cell.
      - Flags are 16×12px local SVGs from the 4:3 set of `flag-icons` v7.3.2, with 2px corners and a fine edge.
        They use 78% opacity and 75% saturation to blend with the quiet rows; hovering restores
@@ -162,7 +167,8 @@ and a simulator, identified by a small amber dot on the wheel (“Simulated data
      and fill; keyboard focus has a visible outline. It still opens the application form in
      another tab. Before registration opens it shows the opening date inside a disabled
      button with the same fixed dimensions, a muted border and fill, and the day before the month
-     ("2 Mar", "21 Mar"). Hovering shows the full registration opening date.
+     ("2 Mar", "21 Mar"). Hovering shows the full registration opening date. On phones that
+     button says Apply, and "Opens 2 Mar" takes the place of the lights.
   6. **Links**: the schedule calendar icon, followed by the notes icon when comments exist.
      Notes are always last, beside the schedule icon, rather than beside the course type.
      The notes button toggles an inline panel under the row showing sanitized comments,
@@ -271,12 +277,15 @@ codes such as "WA" or "IN".
   first line with the wheel and the two buttons; From, As and Lang share the next line when
   they fit. Chips and checkboxes wrap within the available space, and a full-width Search ends
   the controls.
-- Hide column headings in this layout. Each row shows Location first, then Dates / Type /
-  Apply, then the labeled applicant lights and trailing icons. Month headings stick at the
-  top of the viewport. Fixed named grid areas keep this arrangement independent of the saved
-  desktop column order.
-- At 380px and below, row icons move below the lights. Avoid
-  horizontal scrolling at phone widths. Keep controls and suggestion panels within the viewport.
+- Hide column headings in this layout. Rows run edge to edge with 12px insets, in two lines:
+  the flag, name, schedule and notes icons, then Apply at the right edge; below, the dates,
+  type and lights. The lights sit at the right edge in the six fixed slots, unlabeled, and
+  each month heading carries their key (NEW / OLD / SRV over M F). A position a course doesn't
+  offer leaves its slot empty, so each position lines up down the list. Month headings stick at
+  the top of the viewport. Flex order keeps this arrangement independent of the saved desktop
+  column order.
+- Avoid horizontal scrolling at phone widths. Keep controls and suggestion panels within the
+  viewport.
 - Re-measure sticky offsets when the filter bar or list resizes, including when crossing the
   breakpoint. Preserve fractional pixel heights and overlap adjacent sticky layers by 1px so
   rows cannot peek through a rounding gap between the filters, column headings and month headings.

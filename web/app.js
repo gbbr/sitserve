@@ -369,8 +369,11 @@ const link = (href, label, icon) => href ? `<a class="icon" href="${esc(href)}" 
 function rowHTML(c, avail, f) {
   const l = c.loc;
   const statuses = avail === 'soon' ? {} : lights(c);
+  // Before registration opens, the button shows the date on wide screens; phones show a disabled
+  // Apply there and the date in place of the lights.
+  const opens = `${ymd(c.enroll)[2]} ${MON[ymd(c.enroll)[1] - 1]}`;
   const reg = avail === 'soon'
-    ? `<button type="button" class="opens" disabled aria-label="Registration opens ${esc(longDate(c.enroll))}">${ymd(c.enroll)[2]} ${MON[ymd(c.enroll)[1] - 1]}</button>`
+    ? `<button type="button" class="opens" disabled aria-label="Registration opens ${esc(longDate(c.enroll))}"><span class="wide">${opens}</span><span class="narrow">Apply</span></button>`
     : `<a href="${esc(c.apply)}" target="_blank" rel="noopener" aria-label="${esc(`Apply for ${TYPE.get(c.type).name} at ${l.name}, ${longDate(c.start)}`)}">Apply</a>`;
   const cell = k => {
     const s = statuses[k], hl = k === f.as ? ' hl' : '';
@@ -383,7 +386,7 @@ function rowHTML(c, avail, f) {
     location: `<span class="who" data-column="location"><span class="flag" role="img" aria-label="${esc(l.venue ? `${l.venue}, ${l.place}` : l.place)}" data-tip="${esc(l.venue ? `${l.venue}\n${l.place}` : l.place)}">${flag(l.cc)}</span>${l.web ? `<a class="name" href="${esc(l.web)}" target="_blank" rel="noopener"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</a>` : `<span class="name"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</span>`}${l.center ? '' : '<span class="kind noncenter" data-tip="non-center"></span>'}</span>`,
     dates: `<span class="dates" data-column="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>`,
     type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}${BADGE_TONES.get(c.type).solid ? ' solid' : ''}" style="--shade: ${BADGE_TONES.get(c.type).shade}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span></span>`,
-    lights: `<span class="lights" data-column="lights">${lightCells}</span>`,
+    lights: `<span class="lights" data-column="lights">${lightCells}${avail === 'soon' ? `<span class="soon narrow" aria-hidden="true">Opens ${opens}</span>` : ''}</span>`,
     apply: `<span class="reg" data-column="apply"${avail === 'soon' ? ` data-tip="Registration opens ${esc(longDate(c.enroll))}"` : ''}>${reg}</span>`,
     links: `<span class="links" data-column="links">${link(l.schedule, 'Course schedule', ICONS.schedule)}${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
   };
@@ -400,6 +403,10 @@ function headHTML(f) {
     return `<button type="button" class="column-head sortable" data-column="${key}" draggable="true" aria-pressed="${sorted}" aria-label="${label}. ${sort}. Drag to reorder, or use Alt and left or right arrow." aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" data-tip="${sort}\nDrag to reorder · Alt + ← / →"><span class="head-label">${esc(label)}${ICONS.sort}</span></button>`;
   }).join('')}</div>`;
 }
+
+// Phones hide the column headings, so each month heading carries the lights' key.
+const monthKey = f => `<span class="key" aria-hidden="true">${GROUPS.map(([label, , keys]) => `<span class="grp"><b>${label}</b>${keys.map(k =>
+  `<span class="l${k === f.as ? ' hl' : ''}">${k.slice(-1)}</span>`).join('')}</span>`).join('')}</span>`;
 
 const openNotes = new Set();
 const RESULT_LIMIT = 50;
@@ -516,10 +523,10 @@ function updateSearchStatus() {
   status.innerHTML = pending
     ? `${ICONS.warning}<span>Filters changed. Press Search to update results.${state === 'loading' ? ` Searching…${progress}` : ''}</span>`
     : state === 'loading' ? `Searching…${progress}`
-    : searchResult?.error ? 'Press Search to retry.'
+    : searchResult?.error ? `${esc(searchResult.error)} Press Search to retry.`
     : searchResult?.reason === 'cancelled' ? 'Search cancelled. Press Search to try again.'
     : '';
-  $('#checked').hidden = status.textContent !== '';
+  status.parentElement.hidden = !status.textContent;
 }
 const shortDate = date => new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 function checkedText(iso) {
@@ -601,7 +608,6 @@ function render() {
   hideTip();
   list.style.setProperty('--columns', columnOrder.map(k => DISPLAY_COLUMNS[k].width).join(' '));
   const limit = $('#search-limit');
-  $('.summary').hidden = !searchResult;
   $('footer').hidden = !searchResult;
   if (!searchResult) {
     summary.textContent = '';
@@ -622,7 +628,7 @@ function render() {
   list.innerHTML = shown.length
     ? headHTML(f) + [...months].map(([key, items]) => {
         const [y, m] = ymd(key);
-        return `<h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}`;
+        return `<h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span>${monthKey(f)}</h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}`;
       }).join('')
     : loading ? '<p class="empty">Searching…</p>' : error ? '<p class="empty">Search unavailable. Press Search to retry.</p>' : reason === 'cancelled' ? '<p class="empty">Search cancelled.</p>' : '<p class="empty">No courses you can sign up for were found. Change the filters and search again.</p>';
   // Month headings stick just below the column headings.
@@ -632,13 +638,13 @@ function render() {
     if (row) toggleNotes(row, true);
   }
 
-  summary.innerHTML = `<b>${shown.length}</b> course${shown.length === 1 ? '' : 's'} you can sign up for`;
+  summary.textContent = `${shown.length} course${shown.length === 1 ? '' : 's'} you can sign up for`;
   $('#checked').textContent = checkedText(searchResult.checkedAt);
   const detail = partial
     ? `Partial results. Searched through ${searchResult.searchedThrough ? shortDate(searchResult.searchedThrough) : 'the available cached pages'}. Try a later From date or narrower filters.`
     : reason === 'cancelled' ? 'Search cancelled. Results may be incomplete.'
     : shown.length === RESULT_LIMIT ? 'Showing the first 50 matches; change the filters to find others.' : '';
-  limit.textContent = [error, detail].filter(Boolean).join(' ');
+  limit.textContent = detail;
   limit.hidden = !limit.textContent;
 }
 

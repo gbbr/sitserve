@@ -213,15 +213,8 @@
   #theme:hover { color: var(--fg); }
   #theme svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* Summary and legend */
-  .summary { max-width: 1180px; margin: 0 auto; padding: 12px 24px 4px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; color: var(--muted); font-size: 13px; }
-  .summary b { color: var(--fg); }
-  .result-limit { flex-basis: 100%; }
-  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-  .legend span { display: inline-flex; align-items: center; gap: 5px; }
-  .legend .sep { width: 1px; height: 12px; background: var(--line); }
-  .search-state { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-  #checked { color: var(--faint); font-size: 11.5px; }
+  /* Search progress, pending, error and cancelled messages sit under the Search button. */
+  .search-state { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-left: auto; margin-right: calc(var(--tools-w) + var(--edge-gap)); color: var(--muted); font-size: 13px; }
   #search-status { display: inline-flex; align-items: center; gap: 6px; }
   #search-status[data-state="pending"] { color: var(--search-warning); }
   #search-status svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -302,6 +295,8 @@
   i.r { color: var(--closed); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
   #list[data-as]:not([data-as=any]) .l:not(.hl) i.light { opacity: .28; }
   .l.hl i.light { width: 10px; height: 10px; }
+  /* Phone-only pieces: the lights key in month headings and the opening date beside the lights. */
+  h2 .key, .narrow { display: none; }
 
   /* Notes */
   .notes { padding: 8px 12px 10px 38px; border-bottom: 1px solid var(--line); background: var(--notes-bg); color: var(--notes-fg); font-size: 13px; }
@@ -312,8 +307,14 @@
   .empty { padding: 40px 8px; color: var(--muted); text-align: center; }
   footer { max-width: 1180px; margin: 0 auto; padding: 0 24px 32px; color: var(--faint); font-size: 12px; text-align: center; }
   footer p { margin: 0; }
-  #usage { margin-top: 4px; font-variant-numeric: tabular-nums; }
-  #usage:empty { display: none; }
+  footer .legend { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 12px; margin-bottom: 6px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .sep { width: 1px; height: 12px; background: var(--line); }
+  footer .meta { margin-top: 4px; font-variant-numeric: tabular-nums; }
+  footer .meta span:empty { display: none; }
+  #checked:not(:empty) + #usage:not(:empty)::before { content: '·'; margin: 0 6px; }
+  /* A note after the last row when the results stop early: the 50 cap, a partial search or Cancel. */
+  .result-limit { max-width: 1180px; margin: 0 auto; padding: 14px 24px 18px; color: var(--muted); font-size: 13px; text-align: center; }
 
   /* Photo shown while hovering a location's name */
   #photo { position: fixed; z-index: 30; padding: 6px; border-radius: 10px; background: var(--popover-bg); box-shadow: var(--popover-shadow); pointer-events: none; }
@@ -327,9 +328,19 @@
   /* Narrow screens: name on the first line, details on the second, lights (labelled) on the third */
   @media (max-width: 820px) {
     .bar { position: static; }
-    .filter-heading { flex-wrap: wrap; }
-    #filter-summary { order: 1; flex-basis: 100%; width: 100%; max-height: 0; margin-top: 0; transition: max-height 280ms ease, margin-top 280ms ease, opacity 240ms ease; }
-    #filters[data-collapsed=true] #filter-summary { max-height: 34px; margin-top: 6px; opacity: 1; }
+    /* The collapsed summary flows after the wheel and wraps. A float on its first line makes room
+       for the tools; later lines use the space beneath them. It takes no space while the filters
+       are open. */
+    .filter-heading { display: block; position: relative; min-height: 30px; }
+    .brand { position: absolute; top: 0; left: 0; }
+    .filter-tools { position: absolute; top: 0; right: 0; }
+    #filter-summary { display: block; width: auto; margin-left: calc(var(--brand-w) + var(--edge-gap)); padding-top: 3px; overflow: visible; white-space: normal; }
+    #filter-summary::before { content: ''; float: right; width: calc(var(--tools-w) + var(--edge-gap)); height: 27px; }
+    #filters:not([data-collapsed=true]):not(:has(#filter-panel[data-animating])) #filter-summary { display: none; }
+    .filter-group { display: inline; }
+    .filter-group + .filter-group { padding-left: 0; border-left: 0; }
+    .filter-token { margin: 0 4px 5px 0; vertical-align: middle; }
+    .filter-group:not(:last-child) > .filter-token:last-child { margin-right: 12px; }
     /* Where shares the first line with the wheel and tools; Search ends the controls. */
     #filter-controls { display: flex; flex-wrap: wrap; gap: 8px; }
     .filter-row { display: contents; }
@@ -341,21 +352,35 @@
     .filter-sep { display: none; }
     .check { order: 2; }
     .filter-main #search { order: 3; flex-basis: 100%; height: 34px; margin-right: 0; }
+    .search-state { order: 4; flex-basis: 100%; justify-content: center; margin: 0; }
     .place-options { width: 100%; }
-    .head { display: none; }
-    h2 { top: 0; }
-    .row { grid-template-columns: minmax(0, 1fr) 70px auto; grid-template-areas: "location location location" "dates type apply" "lights lights links"; gap: 6px 8px; padding: 8px; }
-    [data-column=location] { grid-area: location; } [data-column=dates] { grid-area: dates; } [data-column=type] { grid-area: type; }
-    [data-column=links] { grid-area: links; justify-self: end; } [data-column=apply] { grid-area: apply; justify-self: end; }
-    [data-column=lights] { grid-area: lights; }
-    .lights { gap: 10px; align-self: auto; flex-wrap: wrap; }
-    .grp { display: flex; gap: 8px; }
-    .l { display: inline-flex; gap: 4px; font-size: 11px; color: var(--muted); }
-    .l:not(:empty)::after { content: attr(data-k); }
-    .notes { padding-left: 12px; }
-  }
-  @media (max-width: 380px) {
-    .row { grid-template-areas: "location location location" "dates type apply" "lights lights lights" ". . links"; }
+    /* Rows run edge to edge in two lines: the name, its icons and Apply, then dates, type and the
+       lights in fixed slots at the right edge, keyed once in each month heading. Flex order keeps
+       this independent of the saved desktop column order; ::after breaks the line. */
+    main { padding: 0 0 32px; }
+    .result-limit, footer { padding-right: 12px; padding-left: 12px; }
+    h2 { top: 0; display: flex; align-items: flex-end; padding: 12px 12px 5px; }
+    h2 .key { display: flex; gap: 8px; margin-left: auto; color: var(--faint); font-size: 8.5px; font-weight: 650; letter-spacing: .04em; line-height: 10px; }
+    h2 .key .grp { row-gap: 1px; }
+    h2 .key b { grid-column: 1 / -1; padding-bottom: 1px; border-bottom: 1px solid var(--line); font-weight: inherit; text-align: center; }
+    h2 .key .hl { color: var(--fg); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; min-height: 0; padding: 7px 12px 8px; }
+    .row::after { content: ''; order: 3; flex-basis: 100%; }
+    .row.head { display: none; }
+    [data-column=location] { order: 0; max-width: calc(100% - 128px); }
+    [data-column=links] { order: 1; display: flex; gap: 0; margin-right: auto; }
+    [data-column=links] > span:empty { display: none; }
+    [data-column=apply] { order: 2; }
+    [data-column=dates], [data-column=type], [data-column=lights] { order: 4; }
+    .dates { min-width: 92px; color: var(--muted); font-size: 13px; }
+    .type-code { padding: 0 5px; font-size: 11.5px; line-height: 17px; }
+    .lights { gap: 8px; align-self: auto; margin-left: auto; }
+    .grp { grid-template-columns: 12px 12px; }
+    .row .l { height: 14px; }
+    .wide, .lights:has(.soon) .grp { display: none; }
+    .narrow { display: revert; }
+    .soon { color: var(--faint); font-size: 12px; white-space: nowrap; }
+    .notes { padding: 8px 12px 10px 35px; }
   }
   @media (prefers-reduced-motion: reduce) {
     #filter-summary { transition: none; }
@@ -411,31 +436,29 @@
     <label class="check"><input type="checkbox" name="wait" checked> Wait lists</label>
     <label class="check"><input type="checkbox" name="soon" checked> Not open yet</label>
     <label class="check"><input type="checkbox" name="centers"> Centers only</label>
+    <span class="search-state" hidden><span id="search-status" role="status"></span><button type="button" id="cancel" hidden>Cancel</button></span>
     </div>
     </div>
     </div>
   </form>
 </div>
 
-<div class="summary" hidden>
-  <span id="summary" role="status"></span>
-  <span class="legend">
+<div id="place-status" class="sr-only" role="status"></div>
+<div id="column-status" class="sr-only" role="status"></div>
+<div id="summary" class="sr-only" role="status"></div>
+<main id="list"></main>
+<p id="search-limit" class="result-limit" hidden></p>
+<footer hidden>
+  <p class="legend">
     <span><i class="kind noncenter"></i>non-center</span>
     <span class="sep"></span>
     <span><i class="light g"></i>open</span>
     <span><i class="light y"></i>wait list</span>
     <span><i class="light o"></i>long wait list</span>
     <span><i class="light r"></i>closed</span>
-  </span>
-  <span class="search-state"><span id="search-status" role="status"></span><button type="button" id="cancel" hidden>Cancel</button><span id="checked"></span></span>
-  <span id="search-limit" class="result-limit" hidden></span>
-</div>
-<div id="place-status" class="sr-only" role="status"></div>
-<div id="column-status" class="sr-only" role="status"></div>
-<main id="list"></main>
-<footer hidden>
+  </p>
   <p>Course information from dhamma.org. Submit Search to check availability.</p>
-  <p id="usage"></p>
+  <p class="meta"><span id="checked"></span><span id="usage"></span></p>
 </footer>
 
 <div id="photo" hidden><img alt=""><div></div></div>
