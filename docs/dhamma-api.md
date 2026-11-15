@@ -1,9 +1,10 @@
 # dhamma.org data sources
 
-Data sources on www.dhamma.org for the sitserve's local simulator and live JavaScript backend.
-None of this is a documented public API: these are the endpoints and inline data the site's own
-pages use, so they can change without notice. Verified 2026-11-13; pagination, date ranges and
-filters rechecked on 2026-11-14, when `/robots.txt` contained no rules.
+The www.dhamma.org endpoints and page data that sitserve's simulator and live backend rely on.
+None is a documented public API: they are what the site's own pages use, so they can change
+without notice. Verified 2026-11-13; pagination, date ranges and filters rechecked on 2026-11-14,
+when `/robots.txt` contained no rules. How sitserve paces and checks its requests is in
+[architecture.md](architecture.md).
 
 dhamma.org's [Terms of Use](https://www.dhamma.org/en/docs/forms/Dhamma.org_Terms_of_Use.pdf),
 a click-through agreement for its online services and APIs, doesn't mention automated access
@@ -13,17 +14,14 @@ Vipassana choices".
 
 Plain HTTP requests work. No cookies, CSRF token or browser headers are needed, and none should be
 sent: don't replay cookies from a browser session (such as Cloudflare's `cf_clearance`) or imitate
-a browser.
-
-A search POST tested with `Origin: http://localhost:8000` returned JSON but no
-`Access-Control-Allow-Origin` header. Browser JavaScript at that origin cannot read the response;
-use a small same-origin JavaScript proxy for live searches. The Origin header was used only to
-check CORS behavior; ordinary backend requests do not need it.
+a browser. Responses have no `Access-Control-Allow-Origin` header, so browser JavaScript on
+another origin can't read them; sitserve calls dhamma.org from its Worker.
 
 ## Course search: `POST /en-US/courses/do_search`
 
 Form-encoded request, JSON response. The site uses the current page's locale prefix (`/en/`,
-`/en-US/`, …); all verified queries used `/en-US/`.
+`/en-US/`, …); all verified queries used `/en-US/`. `worker/dhamma.js` sends the same headers as
+this example:
 
 ```sh
 curl -s -X POST https://www.dhamma.org/en-US/courses/do_search \
@@ -54,32 +52,25 @@ curl -s -X POST https://www.dhamma.org/en-US/courses/do_search \
 | `genders[]` | `Male` or `Female`, the option text the site sends. Accepted, but totals and courses were unchanged. |
 | `course_types[]` | Sent by the site's course type widget; value format untested. |
 
+Neither applicant filter considers availability, so sitserve sends neither: its As filter checks
+the chosen position's status itself.
+
 ### Limits
 
 - 10 courses per page and at most 10 pages, so one query returns at most 100 courses.
   `total_rows` still gives the full count, and `pages_truncated` is `true` when it's over 100.
   Broad queries reach this quickly: the first 100 worldwide 10-day courses from 2026-11-14 all
-  started by Nov 21. sitserve continues with a new query from the last returned start date, within
-  a per-search page cap (see [plan.md](plan.md#live-search)).
+  started by Nov 21. sitserve continues with a new query from the last returned start date,
+  within a per-search page cap (see [architecture.md](architecture.md#search-and-stream)).
+- The page size is fixed at 10: `page_size` and `per_page` are ignored. The site's script sets
+  `page_size: 10` but doesn't send it.
 - Typical sizes for one year from 2026-11-13: new-student courses worldwide 3,487; in the
   Americas 441; long courses (IDs 66, 4, 11, 12, 23, 6, 21) worldwide 278. All of sitserve's
   in-scope types worldwide for one year from 2026-11-14: 4,681.
-- The page size is fixed at 10: `page_size` and `per_page` are ignored. The site's script sets
-  `page_size: 10` but doesn't send it.
-
-### Live pagination check (2026-11-14)
-
-A worldwide `OldStudents` query with all of sitserve's in-scope types and date range
-`2026-11-14 - 2027-11-14` reached 30 usable matches on page 4. Those four pages contained 40
-courses: 33 with an open or wait-list position, four in progress and one cancelled, plus two
-closed courses. The in-progress courses all started on 2026-11-14; no course in these pages
-started before the requested From date. A start date of today does not mean registration is
-still open: courses starting today can already be in progress in the location's local time.
-
-This is one observed query, not a guarantee. Narrower applicant, language or availability
-filters can use up a query's 100 courses with few matches, even when `total_rows` reports many
-more; the date cursor then continues from a later start date. The result limit is a maximum,
-and searches stopped by the page cap must be identified as partial.
+- Not every listed course is open. In one worldwide query for all in-scope types from 2026-11-14,
+  the first four pages (40 courses) held 33 with an open or wait-list position; the rest were in
+  progress, cancelled or closed. Narrower applicant, language or availability filters can use up
+  a query's 100 courses with few matches.
 
 ### Response
 
@@ -103,9 +94,11 @@ Useful course fields:
 | `apply_link_url` | `"/portal/student_apps/new_app?course_id=…&location_id=…"` | Site-relative. |
 | `app_page_url` | `"https://schedule.vridhamma.org/form/…"` | External application form: `schedule.vridhamma.org` for Indian centers, or a `mycourses.dhamma.org/…/initial_enrolment_form/<token>` form that identifies the course. Empty otherwise, including for some courses whose enrollment opens months later. |
 | `comments` | HTML | Notes from the location. |
-| `location` | object | Same fields as the [location API](#location-details-get-enapiv1locationsidjson), plus `sub_location`, `sub_location_id` and `sub_location_url` (a free-form link) naming the course's venue when the location records one. `center_noncenter` and `pin_class` then describe the venue; see [Venues and copied listings](#venues-and-copied-listings). `header_image_path` is the site-relative photo: `/system/images/centers/<name>.jpg`, or a default image under `/assets/`. |
+| `location` | object | The listing location: `id`, `dhamma_name`, `dhamma_name_meaning`, `city_province_country`, `state`, `country`, `country_iso_code`, `center_noncenter` (`center` or `noncenter`), `pin_class`, `website_url`, `schedule_url`, `header_image_path` and more. `header_image_path` is the site-relative photo: `/system/images/centers/<name>.jpg`, or a default image under `/assets/`. When the location records the course's venue, `sub_location`, `sub_location_id`, `sub_location_url` (a free-form link) and `sub_loc_image` (under `/images/sub_location_images/`) describe it; see [Venues and copied listings](#venues-and-copied-listings). |
 
-`location.haversine_distance` is always `null`, and no distance parameter is known.
+A course starting today can already be `In Progress` in the location's local time, so its status,
+not its start date, shows whether it still takes applications. `location.haversine_distance` is
+always `null`, and no distance parameter is known.
 
 ### Venues and copied listings
 
@@ -121,17 +114,21 @@ Verified 2026-11-15 on all 283 saved courses, 156 live results and three schedul
   Pāsāda lists the same courses at its own venue 2239, which has the same name and URL. Each copy
   has its own course ID and application link (`course_id` and `location_id`), but the same type,
   label, dates, enrollment date, languages, status and comments. On the schedule pages, all 11
-  courses with open enrollment used the same mycourses form in both listings. Search returns both records, such as
-  20-day courses 234197 (Bhumi) and 234198 (Pāsāda). Southwest Vipassana Group lists Dhamma
-  Sampatti's courses the same way, and the two listings share one form.
+  courses with open enrollment used the same mycourses form in both listings. Search returns both
+  records, such as 20-day courses 234197 (Bhumi) and 234198 (Pāsāda). Southwest Vipassana Group
+  lists Dhamma Sampatti's courses the same way, and the two listings share one form.
 - Sub-location IDs belong to the listing location, so they never match across copies.
 - Combined schedule pages such as `/en/schedules/noncenter/uk` display other locations' own
   records (here Dhamma Dipa's and Dhamma Sukhakāri's). Search returns those once, under the
   location that holds the course.
 
+sitserve counts a course at a venue naming a directory center as held at that center, and shows
+copies once ([architecture.md](architecture.md#search-and-stream)).
+
 ### Course type IDs
 
-Listed in `viewModel.course_types(...)` on `/en/courses/search`. `web/tools/build-places.js` extracts these from saved HTML. By search mode:
+Listed in `viewModel.course_types(...)` on `/en/courses/search`; `web/tools/build-places.js`
+extracts them from saved HTML. By search mode:
 
 - **NewStudents:** 3 10-Day, 31 9-Day
 - **OldStudents**, under the site's headings:
@@ -154,6 +151,9 @@ Search results give a course's type as a `raw_course_type` code, not the ID: 3 `
 7 `ServicePeriod`, 30 `7-DayTeen`, 13 `Child`, 14 `Child-Teen`, 8 `Teen`. IDs 31, 32, 22, 27 and
 33 had no courses listed through 2027, so their codes are unknown.
 
+There's no long-course-center flag, and centers mix types (Dhamma Tapovana also lists 10-day
+executive, Satipatthana and 1-day courses), so sitserve filters by course type.
+
 ### Place IDs
 
 `regions[]` takes `<kind>_<id>`. Every valid value is listed in `viewModel.search_regions([...])`
@@ -163,33 +163,12 @@ on `/en/courses/search`; `web/places.js` contains the generated `PLACES` metadat
 |---|---|---|---|
 | `region` | 154 | `region_402` Americas | Continents, sub-regions, countries, Indian states. Same IDs as `data-id` on the directory page. |
 | `state` | 142 | `state_3905` Alabama, United States | States and provinces |
-| `location` | 409 | `location_1534` Dhamma Dipa | Centers and non-centers. Same IDs as the location API. |
+| `location` | 409 | `location_1534` Dhamma Dipa | Centers and non-centers. Same IDs as the search results' `location.id`. |
 | `sublocation` | 465 | `sublocation_12303` 2189 Professor Ave, Cleveland, OH | Individual venues |
 
 An entry looks like
 `{"id":["location",1442],"texts":["Dhamma Giri","Maharashtra","Igatpuri","Giri","giri","MH"],"text":"Dhamma Giri, Igatpuri, Maharashtra, India"}`.
 For locations, `texts[4]` is the subdomain.
-
-## Location details: `GET /en/api/v1/locations/<id>.json`
-
-One location as JSON: `id`, `sub_domain`, `dhamma_name`, `city`, `state`, `country`,
-`country_iso_code`, `center_noncenter` (`center` or `noncenter`), `schedule_url`, `website_url`,
-`map_url`, `year_of_first_course`, `location_languages`, and HTML `contact` and `about`. The maps
-page can supply location names and coordinates in one request when only those fields are needed.
-
-## Maps page: `GET /en/maps`
-
-Inline script objects keyed by subdomain (locations) or region code:
-
-- `position_data`: `{"sukhada": {"latitude": "-35.163605", "longitude": "-58.30524", "zoom": 5}, …}`.
-  Coordinates are strings. 563 entries: the 410 locations plus regions. `ci` and `fa` are at
-  0,0 (unknown).
-- `location_data`: `{"sukhada": {"iscenter": true, "title": "Dhamma Sukhadā", "description": "<html>"}, …}`.
-  410 entries (274 centers, 136 non-centers). Non-center titles end in ` non-center`. The
-  description HTML holds the country flag (`flag-ar`), an address line, the schedule link and the
-  website link.
-
-`mitra.in` appears here but not in the search page's place list.
 
 ## Directory: `GET /en/locations/directory`
 
@@ -202,45 +181,11 @@ center/non-center pins, and the search page for selectable places.
 
 ## Schedule pages
 
-`/en/schedules/sch<subdomain>` for centers, `/en/schedules/noncenter/<subdomain>` for non-centers.
-All share one template: tables under `sch-header-year` headings, with rows
-`<tr class="sch-row-N <raw_course_type>">` and columns for apply, dates, type, status, location
-and comments. The location column links to the venue's `sub_location_url`, otherwise to the
-listing location's map entry (`/en/maps#<subdomain>`). Apply links on the Australian and UK pages
-are the mycourses forms from `app_page_url`. Date formats vary (`10 Nov - 21 Nov` with the year
-in the heading, or `December 22, 2026`). sitserve does not use schedule HTML; the search endpoint
-has the same information as structured data.
-
-## Implications for sitserve
-
-- There's no "long-course center" flag, and Dhamma Tapovana's schedule also lists 10-day
-  executive, Satipatthana and 1-day courses. Filter by course type instead.
-- There's no distance filter. Pick nearby locations using the cached coordinates and pass them as
-  several `regions[]=location_<id>`.
-- The site's applicant filters are attend/serve and gender, and neither considers availability.
-  sitserve's As filter (new / old / server × male / female) checks that position's status itself.
-- sitserve counts a course as held at a center when the upstream flag says so or its venue names a
-  directory center, and shows copied listings once (see [plan.md](plan.md#search-and-stream)).
-
-## Local implementation
-
-`worker/dhamma.js` builds this form request with `Accept: application/json` and
-`X-Requested-With: XMLHttpRequest`. Live identity is
-`sitserve/<version> (+<SITE_URL>; <UPSTREAM_CONTACT>)`; missing contact prevents all live requests.
-Redirects are not followed. The client validates page/course fields and classifies throttling,
-5xx, other unsuccessful statuses and redirects, challenges/non-JSON, malformed JSON/envelopes,
-timeout and slow responses, without retries.
-Invalid individual courses are skipped and logged. Valid slow responses are cached and returned
-while further uncached requests pause.
-
-The ordinary development mode is a simulator that parses those real form Requests using saved
-raw course objects. No development command or test needs dhamma.org. The curated byte-identical
-responses, capture dates, known request parameters and hashes are in
-`worker/fixtures/dhamma/manifest.json`; unknown date ranges are recorded as null. Probe metadata
-is in `probe-facts.json`. Corpus fields omitted for size are listed in the manifest.
-
-The DO shares normalized pages for **24 hours**, persisted across restarts; photo storage lasts
-seven days. API responses are streamed NDJSON and have `Cache-Control: no-store`. Run
-`npm run dev`, `npm test`, `npm run test:worker` or `npm run test:browser` for offline work.
-`npm run dev:live` and the Wrangler `production` environment are explicit live modes. See
-[plan.md](plan.md) for pacing, allowances, breaker behavior and the stream contract.
+`/en/schedules/sch<subdomain>` for centers, `/en/schedules/noncenter/<subdomain>` for non-centers;
+`location.schedule_url` links to them. All share one template: tables under `sch-header-year`
+headings, with rows `<tr class="sch-row-N <raw_course_type>">` and columns for apply, dates, type,
+status, location and comments. The location column links to the venue's `sub_location_url`,
+otherwise to the listing location's map entry (`/en/maps#<subdomain>`). Apply links on the
+Australian and UK pages are the mycourses forms from `app_page_url`. Date formats vary
+(`10 Nov - 21 Nov` with the year in the heading, or `December 22, 2026`). sitserve doesn't read
+schedule HTML; the search endpoint has the same information as structured data.

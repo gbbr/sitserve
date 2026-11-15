@@ -7,13 +7,13 @@ test('local Worker: static assets, NDJSON, validation, photos, and full restart 
   let server = await startServer();
   t.after(async () => { await server.stop(); await server.cleanup(); });
   const get = path => fetch(server.url + path);
-  await t.test('serves the page and shared static modules; excludes tools and design', async () => {
+  await t.test('serves the page and shared static modules; excludes tools', async () => {
     const page = await get('/');
     assert.match(await page.text(), /<title>sitserve/);
     assert.equal(page.headers.get('X-Robots-Tag'), 'noindex, nofollow'); assert.equal(page.headers.get('Referrer-Policy'), 'no-referrer');
     assert.equal((await get('/app.js')).status, 200); assert.equal((await get('/shared/courses.js')).status, 200);
     assert.equal((await get('/assets/flags/us.svg')).headers.get('X-Robots-Tag'), 'noindex, nofollow');
-    for (const p of ['/tools/build-places.js', '/design.md', '/_headers']) assert.equal((await get(p)).status, 404);
+    for (const p of ['/tools/build-places.js', '/_headers']) assert.equal((await get(p)).status, 404);
   });
   let first;
   await t.test('streams start, progress and done, with no-store and 50 result limit', async () => {

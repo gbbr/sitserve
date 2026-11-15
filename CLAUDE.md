@@ -4,12 +4,13 @@ A website for finding Vipassana courses listed on dhamma.org that you can still 
 `web/index.html` and `web/app.js` are plain HTML/CSS/JavaScript, with no page build step.
 `worker/` is the Cloudflare Worker and SQLite-backed Durable Object backend.
 
-- UI decisions: [web/design.md](web/design.md)
-- Architecture, limits and development: [docs/plan.md](docs/plan.md)
+- UI decisions: [docs/design.md](docs/design.md)
+- Architecture, limits and development: [docs/architecture.md](docs/architecture.md)
 - Verified upstream behavior: [docs/dhamma-api.md](docs/dhamma-api.md)
 
 Use **sitserve** for the app, package and Worker. Preserve localStorage key `sit.columns`.
-Docs and comments describe the current purpose and behavior, with concise wording.
+Documentation lives in `docs/`. Docs and comments describe the current purpose and behavior,
+with concise wording.
 
 `npm run dev` uses saved data and a local simulator; it never contacts dhamma.org, including
 photos. `npm test`, `npm run test:worker` and `npm run test:browser` are offline. Keep fetch,
