@@ -147,7 +147,7 @@ test('the persisted index and venue evidence survive a new gate instance', async
   const a = make(rawCourses(10).map(c => ({ ...c, location: structuredClone(hawaii) })));
   await a.warm({ ...defaults, where: 'location_1547' }, [1]);
   const index = await a.storage.get(QUERY_INDEX_KEY); assert.equal(index.length, 1);
-  assert.equal(index[0].contiguous, 1); assert.equal(index[0].complete, true); assert.ok(index[0].oldestFetchedAt);
+  assert.equal(index[0].contiguous, 1); assert.equal(index[0].complete, true);
   a.gate = new UpstreamGate(a.options); const before = a.simulator.requests;
   const result = await a.run({ ...defaults, where: 'sublocation_15175' });
   assert.equal(result.courses.length, 10); assert.equal(a.simulator.requests, before);

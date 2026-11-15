@@ -75,7 +75,7 @@ pages and photos (with their chunks), then reschedules for the next expiry. Read
 entries they meet. Identical in-flight requests share one fetch.
 
 A cached broader query can answer a narrower one. A persisted index records up to 32 query
-sequences: their contiguous cached pages, how far they cover and their oldest fetch time. A
+sequences: their contiguous cached pages and how far they cover. A
 sequence covers a search when it has the same end date, an earlier or equal From, a superset of
 the search's type IDs and places (by directory ancestry, location states and cached venue
 parents), and no language or the same one. The furthest-reaching covering sequence is replayed

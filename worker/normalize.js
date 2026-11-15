@@ -1,7 +1,6 @@
 import { rawPageFacts } from './dhamma.js';
-import { TYPE, venueCenters } from '../web/shared/courses.js';
+import { TYPE, venueCenters, escapeHTML } from '../web/shared/courses.js';
 const BASE = 'https://www.dhamma.org';
-export const escapeHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export function safeURL(value, protocols = ['http:', 'https:']) {
   if (!value || /[\u0000-\u001f\u007f]/.test(value)) return '';
   try { const u = new URL(value, BASE); return protocols.includes(u.protocol) ? u.href : ''; } catch { return ''; }

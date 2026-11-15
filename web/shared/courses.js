@@ -42,6 +42,8 @@ export const FILTER_TYPES = TYPES.filter(([raw]) => raw !== 'TSC').map(([raw]) =
   .sort(([a], [b]) => FILTER_GROUP_ORDER[typeClass(a)] - FILTER_GROUP_ORDER[typeClass(b)] || filterDuration(a) - filterDuration(b));
 
 export const fold = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Escapes text for HTML content and quoted attribute values.
+export const escapeHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const places = PLACES.map(([kind, id, text, texts, tag, count]) => ({
   kind, id, text, texts, tag, count, key: `${kind}_${id}`, search: [...texts, text].map(fold),
 }));
@@ -100,6 +102,8 @@ export function matches(c, f) {
 }
 // The most places one search combines; each is sent upstream and compared with cached queries.
 export const MAX_PLACES = 10;
+// The most matching courses one search returns.
+export const RESULT_LIMIT = 50;
 export const filterDefaults = (today = utcToday()) => ({ where: '', from: today, types: '', as: 'any', lang: '', centers: false, wait: true, soon: true });
 export const validDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
 export function parseFilters(input = '', { today = utcToday(), strict = false } = {}) {

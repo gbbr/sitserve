@@ -1,5 +1,6 @@
 import corpus from './fixtures/dhamma/corpus.json' with { type: 'json' };
 import { TYPES, placeByKey, placeMatches, languageNames, utcToday } from '../web/shared/courses.js';
+import { SEARCH_URL } from './dhamma.js';
 const IDS = new Map(TYPES.map(([raw, , , id]) => [raw, id]).concat([
   ['1-DayOSC', 5], ['2-DayOSC', 19], ['4-hrOSC', 25], ['OSProgram', 24], ['OpenHouse', 15], ['Other', 26],
   ['ServicePeriod', 7], ['7-DayTeen', 30], ['Child', 13], ['Child-Teen', 14], ['Teen', 8],
@@ -28,13 +29,13 @@ export function sparseCorpus(rows = corpus) {
       status: [{ type: null, label: null, status: i === 105 ? 'Open' : 'Closed', color: i === 105 ? 'Green' : 'Red' }] };
   });
 }
-export function createSimulator({ rows = corpus, env = {}, clock = Date.now, timers = globalThis, onRequest = () => {} } = {}) {
+export function createSimulator({ rows = corpus, env = {}, clock = Date.now, timers = globalThis } = {}) {
   if (env.SIMULATOR_SCENARIO === 'sparse') rows = sparseCorpus(rows);
   const data = env.SIMULATOR_DATE_SHIFT === '1' ? shiftCorpus(rows, weekShift(utcToday(clock))) : rows;
   let requests = 0;
   const fetch = async request => {
-    if (request.url !== 'https://www.dhamma.org/en-US/courses/do_search' || request.method !== 'POST') throw new Error('Simulator requires a real do_search POST Request');
-    requests++; onRequest(requests);
+    if (request.url !== SEARCH_URL || request.method !== 'POST') throw new Error('Simulator requires a real do_search POST Request');
+    requests++;
     const delay = +(env.SIMULATOR_DELAY_MS || 0);
     if (delay) await new Promise((resolve, reject) => {
       const id = timers.setTimeout(resolve, delay);

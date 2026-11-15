@@ -71,8 +71,6 @@ function summarize(sequence) {
   sequence.contiguous = prefix.length;
   sequence.complete = !!last && last.number === last.lastPage && !last.truncated;
   sequence.coverageEnd = sequence.complete ? sequence.params.end : prefix.map(p => p.lastStart).filter(Boolean).at(-1) || null;
-  sequence.oldestFetchedAt = prefix.length ? prefix.map(p => p.fetchedAt).sort()[0] : null;
-  sequence.expiresAt = Math.min(...sequence.pages.map(p => p.expiresAt));
 }
 export class QueryIndex {
   constructor({ storage, clock, namespace, schema }) {
@@ -113,7 +111,7 @@ export class QueryIndex {
       venues.push({ subId: loc.subId, id: loc.id, state: loc.state, country: loc.country });
     sequence.pages = sequence.pages.filter(p => p.number !== params.page);
     sequence.pages.push({ number: params.page, key, lastStart: entry.page.rawLastStart, lastPage: entry.page.pages,
-      truncated: entry.page.pages_truncated, fetchedAt: entry.fetchedAt, expiresAt: entry.expiresAt, venues });
+      truncated: entry.page.pages_truncated, expiresAt: entry.expiresAt, venues });
     summarize(sequence);
     this.sequences = this.sequences.filter(s => s !== sequence);
     this.sequences.push(sequence);

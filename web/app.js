@@ -1,9 +1,7 @@
 import { LANGUAGES } from './places.js';
-import { COLUMNS, GROUPS, KEYS, COLUMN_NAME, LIGHTS, TYPE, TYPES, FILTER_TYPES,
-  typeClass, typeTip, filterTypeTip, filterDuration, fold, places, placeByKey, lights, availability,
-  filterDefaults, parseFilters, serializeFilters, MAX_PLACES } from './shared/courses.js';
-
-'use strict';
+import { GROUPS, COLUMN_NAME, LIGHTS, TYPE, TYPES, FILTER_TYPES,
+  typeClass, typeTip, filterTypeTip, filterDuration, fold, escapeHTML as esc, places, placeByKey, lights, availability,
+  filterDefaults, parseFilters, serializeFilters, MAX_PLACES, RESULT_LIMIT } from './shared/courses.js';
 
 // Use the viewer's local calendar date; a UTC conversion can shift it by a day.
 const now = new Date();
@@ -33,7 +31,6 @@ const $ = sel => document.querySelector(sel);
 const form = $('#filters'), list = $('#list'), summary = $('#summary'), photo = $('#photo');
 const byId = new Map();
 
-const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const inertHTML = html => { const el = document.createElement('template'); el.innerHTML = html; return el.content; };
 const textOf = html => inertHTML(html).textContent.replace(/\s+/g, ' ').trim();
 const FLAG_CODES = new Set(["ae","ar","au","be","br","ca","co","de","es","fr","gb","gr","id","il","in","it","jp","kr","lk","mm","nl","np","pe","pl","ru","se","th","tw","us","vn"]);
@@ -331,7 +328,7 @@ function readFilters() {
   return f;
 }
 function setFilters(f) {
-  const types = new Set(f.types.split(',').map(code => ['14D', 'TSC'].includes(code) ? '14D/TSC' : code));
+  const types = new Set(f.types.split(','));
   for (const i of form.querySelectorAll('[name=types]')) i.checked = types.has(i.value);
   for (const [k, d] of Object.entries(DEFAULTS)) {
     if (k === 'types') continue;
@@ -410,7 +407,6 @@ const monthKey = f => `<span class="key" aria-hidden="true">${GROUPS.map(([label
   `<span class="l${k === f.as ? ' hl' : ''}">${k.slice(-1)}</span>`).join('')}</span>`).join('')}</span>`;
 
 const openNotes = new Set();
-const RESULT_LIMIT = 50;
 let searchResult = null, controller = null;
 let filterAnimation = null, filterFade = null, autoCollapseTimer = null;
 
@@ -612,7 +608,7 @@ function render() {
   $('footer').hidden = !searchResult;
   if (!searchResult) {
     summary.textContent = '';
-    list.innerHTML = '<p class="empty">Choose your filters and press Search to find up to 50 matching courses.</p>';
+    list.innerHTML = `<p class="empty">Choose your filters and press Search to find up to ${RESULT_LIMIT} matching courses.</p>`;
     limit.hidden = true;
     return;
   }
@@ -644,7 +640,7 @@ function render() {
   const detail = partial
     ? `Partial results. Searched through ${searchResult.searchedThrough ? shortDate(searchResult.searchedThrough) : 'the available cached pages'}. Try a later From date or narrower filters.`
     : reason === 'cancelled' ? 'Search cancelled. Results may be incomplete.'
-    : shown.length === RESULT_LIMIT ? 'Showing the first 50 matches; change the filters to find others.' : '';
+    : shown.length === RESULT_LIMIT ? `Showing the first ${RESULT_LIMIT} matches; change the filters to find others.` : '';
   limit.textContent = detail;
   limit.hidden = !limit.textContent;
 }

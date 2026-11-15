@@ -1,7 +1,7 @@
 import { buildRequest, getDhammaPage, readResponse, timedRequest, UpstreamError } from './dhamma.js';
-import { normalizePage, escapeHTML, validPhotoPath } from './normalize.js';
+import { normalizePage, validPhotoPath } from './normalize.js';
 import { createSimulator } from './simulator.js';
-import { parseFilters } from '../web/shared/courses.js';
+import { escapeHTML, parseFilters } from '../web/shared/courses.js';
 import { QueryIndex, queryParams } from './query-cache.js';
 import { search, serverToday } from './search.js';
 const HOUR = 3600000, DAY = 24 * HOUR;
@@ -202,7 +202,7 @@ export class UpstreamGate {
       }
     } finally { this.running = false; }
   }
-  async photo(path, session) {
+  async photo(path) {
     if (!validPhotoPath(path)) throw new UpstreamError('path', 'Invalid photo path.');
     if (this.env.UPSTREAM !== 'live') return { type: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="284" height="200" viewBox="0 0 284 200"><rect width="284" height="200" fill="#e8edf0"/><text x="142" y="90" text-anchor="middle" fill="#586171" font-family="sans-serif" font-size="13">simulated photo</text><text x="142" y="115" text-anchor="middle" fill="#586171" font-family="sans-serif" font-size="10">${escapeHTML(path.split('/').at(-1))}</text></svg>` };
     await this.ready;
@@ -216,7 +216,7 @@ export class UpstreamGate {
       return { body, type: hit.type };
     };
     const hit = await this.cached(key); if (hit) return read(hit);
-    return this.enqueue(key, session, 'photos', async () => {
+    return this.enqueue(key, null, 'photos', async () => {
       const identity = buildRequest({ types: [3], regions: [], language: '', from: '', end: '', page: 1 }, this.env).headers.get('User-Agent');
       const value = await timedRequest(new Request('https://www.dhamma.org' + path, { redirect: 'manual', headers: { 'User-Agent': identity, Accept: 'image/*' } }), {
         fetch: this.fetch, clock: this.clock, timers: this.timers, timeout: +(this.env.UPSTREAM_TIMEOUT_MS || 20000), slow: +(this.env.UPSTREAM_SLOW_MS || 10000),

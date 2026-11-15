@@ -287,7 +287,7 @@ async function main() {
       await pick('dhara', 'location_1542');
       await submit();
       assert.deepEqual(await rowIDs(), expected.dhara);
-      await load('where=sublocation_2156');
+      await load('where=sublocation_15175');
       assert.deepEqual(await rowIDs(), expected.venue);
       await load('where=unknown_1,location_1542,location_1542');
       assert.equal(await page.locator('[name=where]').inputValue(), 'location_1542');

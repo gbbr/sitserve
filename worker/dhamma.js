@@ -23,7 +23,7 @@ export function buildRequest(params, env = {}) {
   return new Request(SEARCH_URL, { method: 'POST', redirect: 'manual', headers: {
     Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest',
     'Content-Type': 'application/x-www-form-urlencoded',
-    'User-Agent': `sitserve/${env.VERSION || VERSION} (+${env.SITE_URL || 'http://localhost:8787'}; ${env.UPSTREAM_CONTACT || 'local simulator'})`,
+    'User-Agent': `sitserve/${VERSION} (+${env.SITE_URL || 'http://localhost:8787'}; ${env.UPSTREAM_CONTACT || 'local simulator'})`,
   }, body });
 }
 export function retryAfter(value, now = Date.now()) {

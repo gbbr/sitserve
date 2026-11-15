@@ -35,10 +35,8 @@ test('As, wait lists, not open, cancellation and new-student restrictions', () =
 });
 test('shared matches rechecks language, places, type and centers', () => {
   const c = { ...course, langs:['English'],loc:{ ...course.loc,id:1542,state:'Massachusetts',country:'United States',subId:2156,center:true } };
-  for(const where of ['region_402','location_1542','sublocation_2156','state_3930']) {
-    if(where==='state_3930') continue;
-    assert.equal(matches(c,{ ...f,where }),true,where);
-  }
+  for(const where of ['region_402','location_1542','sublocation_2156','state_3925']) assert.equal(matches(c,{ ...f,where }),true,where);
+  assert.equal(matches(c,{ ...f,where:'state_3930' }),false);
   assert.equal(matches(c,{ ...f,where:'location_1442' }),false);
   assert.equal(matches(c,{ ...f,where:'location_1442,region_402' }),true);
   assert.equal(matches(c,{ ...f,lang:'en' }),true); assert.equal(matches(c,{ ...f,lang:'fr' }),false);

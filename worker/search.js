@@ -1,4 +1,4 @@
-import { availability, matches, utcToday, venueCenters } from '../web/shared/courses.js';
+import { availability, matches, utcToday, venueCenters, RESULT_LIMIT } from '../web/shared/courses.js';
 import { requestParams } from './dhamma.js';
 export function serverToday(env = {}, clock = Date.now) { return env.SITSERVE_TODAY || utcToday(clock); }
 export function clampFilters(filters, today) {
@@ -27,7 +27,7 @@ export function sameCourse(a, b) {
   const at = heldAt(a);
   return at !== null && at === heldAt(b) && (!a.loc.venueUrl || !b.loc.venueUrl || a.loc.venueUrl === b.loc.venueUrl);
 }
-export async function search(filters, { getPage, getCachedSequence = async () => null, emit = () => {}, signal, today = utcToday(), cap = 20, limit = 50 }) {
+export async function search(filters, { getPage, getCachedSequence = async () => null, emit = () => {}, signal, today = utcToday(), cap = 20, limit = RESULT_LIMIT }) {
   const f = clampFilters(filters, today), seen = new Set(), seenRaw = new Set();
   // Matching courses already sent, and copies held while the listing of the center holding them can still arrive.
   const sent = [], held = [];
