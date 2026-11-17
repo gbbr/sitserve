@@ -102,11 +102,13 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
   name; clicking the Type heading sorts by course type in chip order (14D and TSC together), then
   date and name, and Dates restores date order. The active heading is darker with a small
   chevron; the other shows a faint chevron on hover. The choice is stored in localStorage as
-  `sit.sort`, and phones, which hide the headings, use it too.
+  `sit.sort`, and phones, which show only the lights' key, use it too.
 - **Headings**: column headings stick under the filter bar and month headings under them,
-  following the bar as it opens or collapses. The heading band spans the full page width while
-  rows keep their constrained width. NEW / OLD / SRV each have a fine rule above their M / F
-  labels, and month counts sit in a small muted pill.
+  following the bar as it opens or collapses. Both heading bands span the full page width while
+  rows keep their constrained width; month headings are a dimmer shade of the column headings'
+  band, with their labels vertically centered. Each month is its own section, so an arriving
+  month heading pushes the stuck one away. NEW / OLD / SRV each have a fine rule above their
+  M / F labels, and month counts sit in a small muted pill.
 - **Rows**: one compact line each on wide screens.
 - **Columns**, in default order, can be rearranged by dragging their headings (a marker shows
   which side the column will land on) or with Alt + Left/Right on a focused heading. The order is
@@ -143,7 +145,10 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
      the standard type. Open panels survive filter changes and column reordering while their
      courses remain shown.
 - **Tooltips**: every hover uses one instant custom tooltip (`data-tip`), because native `title`
-  tooltips lag or don't show.
+  tooltips lag or don't show. Tooltips, the location photo and hover styles follow a mouse only,
+  since touch browsers report a tap as a hover. On touch, tapping a row's flag, dates, type
+  badge, light or non-center dot toggles its tooltip, and any other tap closes it; links and
+  buttons show none, and names show no photo.
 
 ### Type badges
 
@@ -220,12 +225,16 @@ city, short name, subdomain and codes such as "WA" or "IN".
 - At 820px and below, the filter bar scrolls with the page. Where shares the first line with the
   wheel and the two buttons; From, As and Lang share the next when they fit. Chips and checkboxes
   wrap, and a full-width Search ends the controls.
-- Phones hide the column headings. Rows run edge to edge with small insets, in two lines: the
-  flag, name, schedule and notes icons, with Apply at the right edge; then the dates, type and
-  lights. The lights sit at the right in six fixed, unlabeled slots, and each month heading
-  carries their key (NEW / OLD / SRV over M F). A position a course doesn't offer leaves its slot
-  empty, so each position lines up down the list. Month headings stick at the top of the
-  viewport. Flex order keeps this arrangement independent of the saved desktop column order.
+- Phones keep only the lights column heading (NEW / OLD / SRV over M F), at the right of a band
+  in the column headings' color that sticks at the top of the viewport. The current month's label
+  sits at its left, so the month and the key share one band. Further down, month headings keep
+  their dimmer band; as one arrives, its band slides under the sticky one and its label pushes
+  the previous month's out. Rows
+  run edge to edge with small insets, in two lines: the flag, name, schedule and notes icons, with
+  Apply at the right edge; then the dates, type and lights. The lights sit at the right in six
+  fixed, unlabeled slots under the key. A position a course doesn't offer leaves its slot empty,
+  so each position lines up down the list. Flex order keeps this arrangement independent of the
+  saved desktop column order.
 - No horizontal scrolling at phone widths; controls and suggestion panels stay within the
   viewport.
 - Sticky offsets are re-measured whenever the filter bar or list resizes, including across the

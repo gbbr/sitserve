@@ -457,14 +457,8 @@ async function main() {
 
     await check('Type and Dates headings sort rows within each month and the choice persists', async () => {
       // Each month's rows as [id, type code], in display order.
-      const months = () => page.locator('#list').evaluate(list => {
-        const groups = [];
-        for (const el of list.children) {
-          if (el.tagName === 'H2') groups.push([]);
-          else if (el.matches('.row[data-id]')) groups.at(-1).push([el.dataset.id, el.querySelector('.type-code').textContent]);
-        }
-        return groups;
-      });
+      const months = () => page.locator('#list .month').evaluateAll(sections => sections.map(section =>
+        [...section.querySelectorAll('.row[data-id]')].map(row => [row.dataset.id, row.querySelector('.type-code').textContent])));
       const pressed = () => page.locator('.column-head.sortable').evaluateAll(els => els.filter(el => el.getAttribute('aria-pressed') === 'true').map(el => el.dataset.column));
       assert.deepEqual(await page.locator('.column-head.sortable').evaluateAll(els => els.map(el => el.dataset.column).sort()), ['dates', 'type']);
       assert.deepEqual(await pressed(), ['dates']);
@@ -491,7 +485,8 @@ async function main() {
         await page.setViewportSize({ width, height: 1000 });
         await page.waitForFunction(() => Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--head-h')) - (document.querySelector('.head')?.getBoundingClientRect().height || 0)) < .01);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${width}px`);
-        assert.equal(await page.locator('.head').isVisible(), width > 820);
+        assert.equal(await page.locator('.column-head[data-column=location]').isVisible(), width > 820);
+        assert.ok(await page.locator('.column-head[data-column=lights]').isVisible());
         const expandedHeight = (await page.locator('.bar').boundingBox()).height;
         await collapseFilters();
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `collapsed header overflow at ${width}px`);
@@ -551,17 +546,40 @@ async function main() {
         assert.equal(r.button, 'Apply');
         if (r.soon) assert.match(r.soon, /^Opens \d+ [A-Z][a-z]{2}$/);
       }
-      // The month heading's key sits over the lights' fixed slots.
+      // One lights key sits over the lights' fixed slots; month headings carry none.
       const offsets = await page.evaluate(() => {
-        const month = document.querySelector('#list h2');
-        let row = month.nextElementSibling;
-        while (!row.matches('.row[data-id]') || row.querySelector('.soon')) row = row.nextElementSibling;
+        const row = [...document.querySelectorAll('.row[data-id]')].find(r => !r.querySelector('.soon'));
         const centers = els => [...els].map(el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; });
         const lights = centers(row.querySelectorAll('.lights .l'));
-        return centers(month.querySelectorAll('.key .l')).map((x, i) => Math.abs(x - lights[i]));
+        return centers(document.querySelectorAll('.head .l')).map((x, i) => Math.abs(x - lights[i]));
       });
       assert.equal(offsets.length, 6);
       assert.ok(offsets.every(d => d < .5), `key offsets ${offsets}`);
+      assert.equal(await page.locator('h2 .l').count(), 0);
+      // The key shares one sticky band with the month heading stuck at the top of the viewport.
+      const position = await page.evaluate(() => Math.min(600, document.documentElement.scrollHeight - innerHeight));
+      await page.evaluate(position => scrollTo(0, position), position);
+      await page.waitForFunction(position => scrollY === position, position);
+      const sticky = await page.evaluate(() => {
+        const head = document.querySelector('.head').getBoundingClientRect();
+        const month = [...document.querySelectorAll('h2')].filter(h => h.getBoundingClientRect().top < 1).at(-1).getBoundingClientRect();
+        const key = document.querySelector('.head .lights').getBoundingClientRect();
+        // The band has the column headings' color; month headings further down are dimmer.
+        const band = getComputedStyle(document.querySelector('.head')).backgroundColor;
+        const below = [...document.querySelectorAll('.month')].find(m => m.getBoundingClientRect().top > head.bottom);
+        const root = getComputedStyle(document.documentElement);
+        return {
+          headTop: head.top, monthTop: month.top, keyInside: key.top >= month.top && key.bottom <= month.bottom,
+          band, header: root.getPropertyValue('--header-bg'), below: below && getComputedStyle(below, '::before').backgroundColor,
+          dim: root.getPropertyValue('--month-bg'), monthOwn: getComputedStyle(document.querySelector('h2')).backgroundColor,
+        };
+      });
+      assert.ok(sticky.headTop === 0 && sticky.monthTop === 0 && sticky.keyInside, JSON.stringify(sticky));
+      const rgb = hex => `rgb(${hex.trim().match(/\w\w/g).map(h => parseInt(h, 16)).join(', ')})`;
+      assert.equal(sticky.band, rgb(sticky.header));
+      assert.equal(sticky.below, rgb(sticky.dim));
+      assert.equal(sticky.monthOwn, 'rgba(0, 0, 0, 0)');
+      await page.evaluate(() => scrollTo(0, 0));
 
       await load('where=region_402&types=10D,20D,STP,3D&as=OM&lang=en&centers=1&wait=0');
       assert.equal(await page.locator('.filter-heading').evaluate(el => el.getBoundingClientRect().height), 30, 'open filters leave no room for the summary');
@@ -662,6 +680,37 @@ async function main() {
       await page.locator('#photo').waitFor({ state: 'visible' });
       assert.match(await page.locator('#photo img').getAttribute('src'), /^\/photo\/(?:system\/images|assets)\//);
       await page.waitForFunction(() => document.querySelector('#photo img').complete && document.querySelector('#photo img').naturalWidth > 0);
+    });
+    await check('touch taps show row-detail tooltips only, with no photo or sticky hover', async () => {
+      const p = await safePage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, timezoneId: 'UTC' });
+      try {
+        await p.clock.setFixedTime(new Date('2026-11-14T12:00:00Z'));
+        p.on('pageerror', error => errors.push(error.message));
+        await p.goto(url);
+        await p.locator('#search').tap();
+        await p.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelector('#filter-controls').hidden);
+        assert.equal(await p.evaluate(() => matchMedia('(hover: hover)').matches), false);
+        const tip = p.locator('#tip'), row = p.locator('.row[data-id]').first();
+        await p.locator('#theme').tap();
+        assert.equal(await tip.isVisible(), false, 'controls show no tooltip');
+        // Links stay put so the tapped name doesn't open the location's website.
+        await p.evaluate(() => document.addEventListener('click', e => e.preventDefault(), { capture: true }));
+        await p.locator('.row[data-id] .name[data-photo]').first().tap();
+        await p.waitForTimeout(300);
+        assert.equal(await p.locator('#photo').isVisible(), false, 'names show no photo');
+        assert.equal(await tip.isVisible(), false);
+        for (const detail of ['.dates', '.flag', '.type-code']) {
+          await row.locator(detail).tap();
+          assert.equal(await tip.innerText(), await row.locator(detail).getAttribute('data-tip'), detail);
+        }
+        await row.locator('.type-code').tap();
+        assert.equal(await tip.isVisible(), false, 'a second tap closes it');
+        await row.locator('.dates').tap();
+        await p.locator('h2').first().tap();
+        assert.equal(await tip.isVisible(), false, 'a tap elsewhere closes it');
+        const background = await row.evaluate(el => getComputedStyle(el).backgroundColor);
+        assert.equal(background, 'rgba(0, 0, 0, 0)', 'the tapped row keeps no hover background');
+      } finally { await p.close(); }
     });
     await check('old language names restore ISO codes and empty results are clear', async () => {
       await load('lang=English&where=sublocation_2156');

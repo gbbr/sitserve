@@ -402,10 +402,6 @@ function headHTML(f) {
   }).join('')}</div>`;
 }
 
-// Phones hide the column headings, so each month heading carries the lights' key.
-const monthKey = f => `<span class="key" aria-hidden="true">${GROUPS.map(([label, , keys]) => `<span class="grp"><b>${label}</b>${keys.map(k =>
-  `<span class="l${k === f.as ? ' hl' : ''}">${k.slice(-1)}</span>`).join('')}</span>`).join('')}</span>`;
-
 const openNotes = new Set();
 let searchResult = null, controller = null;
 let filterAnimation = null, filterFade = null, autoCollapseTimer = null;
@@ -626,7 +622,7 @@ function render() {
   list.innerHTML = shown.length
     ? headHTML(f) + [...months].map(([key, items]) => {
         const [y, m] = ymd(key);
-        return `<h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span>${monthKey(f)}</h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}`;
+        return `<section class="month"><h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}</section>`;
       }).join('')
     : loading ? '<p class="empty">Searching…</p>' : error ? '<p class="empty">Search unavailable. Press Search to retry.</p>' : reason === 'cancelled' ? '<p class="empty">Search cancelled.</p>' : '<p class="empty">No courses you can sign up for were found. Change the filters and search again.</p>';
   // Month headings stick just below the column headings.
@@ -734,16 +730,30 @@ function hideTip() {
   tipFor = null;
 }
 
-document.addEventListener('mouseover', e => {
+// Hover popovers follow a mouse only: touch browsers report a tap as a hover, which would cover
+// what was just tapped.
+document.addEventListener('pointerover', e => {
+  if (e.pointerType !== 'mouse') return;
   const name = e.target.closest('.name[data-photo]');
   if (name && name !== photoFor && name !== photoPending) schedulePhoto(name);
   const el = e.target.closest('[data-tip]');
   if (el && el !== tipFor) showTip(el);
 });
-document.addEventListener('mouseout', e => {
+document.addEventListener('pointerout', e => {
+  if (e.pointerType !== 'mouse') return;
   const current = photoFor || photoPending;
   if (current && !current.contains(e.relatedTarget)) hidePhoto();
   if (tipFor && !tipFor.contains(e.relatedTarget)) hideTip();
+});
+// On touch, tapping a row detail with no other way to read it toggles its tooltip; any other tap
+// closes it. Links and buttons never show tooltips on touch. pointerup reaches non-interactive
+// elements on iOS, where a delegated click may not, and a scroll cancels it.
+const TAP_TIPS = '.row[data-id] :is(.flag, .kind, .dates, .type-code, .l[data-tip])';
+document.addEventListener('pointerup', e => {
+  if (e.pointerType === 'mouse') return;
+  const el = e.target.closest(TAP_TIPS);
+  if (el && el !== tipFor) showTip(el);
+  else hideTip();
 });
 addEventListener('scroll', () => { hidePhoto(); hideTip(); }, { passive: true });
 
