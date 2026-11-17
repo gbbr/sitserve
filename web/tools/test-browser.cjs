@@ -1,6 +1,8 @@
 // Served-page regression checks. npm run test:browser boots an offline local Worker.
 const assert = require('node:assert/strict');
 const { existsSync } = require('node:fs');
+const { mkdtemp, rm } = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const { startServer } = require('../../worker/test/server.cjs');
 const { chromium } = require('playwright');
@@ -798,6 +800,64 @@ async function main() {
         assert.match(await p.locator('#search-status').innerText(), /paused/i);
         assert.equal((await (await fetch(local.url + '/api/debug')).json()).simulatorRequests, 1);
       });
+    });
+    await check('installable app with sized icons, an offline start and a matching theme color', async () => {
+      // A persistent profile, since Chrome reports every incognito page as not installable.
+      const profile = await mkdtemp(path.join(os.tmpdir(), 'sitserve-profile-'));
+      const context = await chromium.launchPersistentContext(profile, {
+        args: ['--disable-background-networking'],
+        headless: true,
+        timezoneId: 'UTC',
+        executablePath: process.env.CHROME_PATH || (existsSync(macChrome) ? macChrome : undefined),
+      });
+      const pageErrors = [];
+      try {
+        await context.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+        const p = context.pages()[0] || await context.newPage();
+        p.on('pageerror', error => pageErrors.push(error.message));
+        await p.clock.setFixedTime(new Date('2026-11-14T12:00:00Z'));
+        await p.goto(url);
+        await p.evaluate(() => navigator.serviceWorker.ready);
+        const cdp = await context.newCDPSession(p);
+        assert.deepEqual((await cdp.send('Page.getInstallabilityErrors')).installabilityErrors, []);
+        const manifest = await cdp.send('Page.getAppManifest');
+        assert.deepEqual(manifest.errors, []);
+        const icons = [
+          ...JSON.parse(manifest.data).icons.map(icon => [new URL(icon.src, manifest.url).href, icon.sizes]),
+          ...await p.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => [link.href, link.getAttribute('sizes') || '180x180'])),
+        ];
+        assert.equal(icons.length, 6);
+        for (const [href, sizes] of icons) {
+          const response = await fetch(href);
+          assert.equal(response.headers.get('content-type'), 'image/png', href);
+          const png = Buffer.from(await response.arrayBuffer());
+          assert.equal(`${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`, sizes, href);
+        }
+        // Offline before any other visit, so every startup file must come from the install cache.
+        await context.setOffline(true);
+        await p.reload();
+        assert.ok(await p.evaluate(() => navigator.serviceWorker.controller !== null));
+        assert.match(await p.locator('#list').innerText(), /press Search/);
+        // An emulated-offline reload leaves navigator.onLine true, so go offline again.
+        await context.setOffline(false);
+        await context.setOffline(true);
+        await p.locator('#search').click();
+        await p.waitForFunction(() => !document.querySelector('#search').disabled);
+        assert.equal(await p.locator('#search-status').innerText(), "You're offline. Press Search to retry.");
+        await context.setOffline(false);
+        await p.locator('#search').click();
+        await p.waitForFunction(() => !document.querySelector('#search').disabled && document.querySelectorAll('.row[data-id]').length > 0);
+        const cached = await p.evaluate(async () => (await (await caches.open('sitserve-v1')).keys()).map(request => new URL(request.url).pathname));
+        assert.ok(cached.includes('/app.js'));
+        assert.deepEqual(cached.filter(pathname => /^\/(api|photo)\//.test(pathname)), []);
+        const themeColor = () => p.locator('meta[name=theme-color]').getAttribute('content');
+        assert.equal(await themeColor(), '#f7f1e5');
+        await p.locator('#theme').click();
+        assert.equal(await themeColor(), '#211c18');
+        await p.reload();
+        assert.equal(await themeColor(), '#211c18');
+        assert.deepEqual(pageErrors, []);
+      } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
     });
     console.log(`${passed} browser checks passed.`);
   } finally {

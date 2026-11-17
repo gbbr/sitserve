@@ -112,6 +112,21 @@ lifetime. A photo answering 404/410 or larger than 2 MB is stored as missing for
 readable and are deleted when their photo expires or is absent. Simulator photos are generated
 SVG placeholders.
 
+## Installable app
+
+The page is a progressive web app, so it can be installed to a home screen or desktop.
+`web/manifest.webmanifest` names it and lists the icons in `web/icons/`; `web/sw.js` is its
+service worker. Page files come from the network while online, so a deploy shows on the next
+load, and from the worker's cache offline. Installing the worker caches the files the page loads
+at startup, and later loads refresh them. `SHELL` in `web/sw.js` must list every startup file; the
+browser tests reload offline to check it. Only complete same-origin responses are cached. `/api/`,
+`/photo/` and Cloudflare's `/cdn-cgi/` paths always use the network, and redirects, such as Access
+sending an expired session to its login page, pass through. Offline, the page opens with its
+filters, and Search reports that the viewer is offline.
+
+Browsers fetch a manifest without cookies unless its link has `crossorigin="use-credentials"`,
+which Access needs in order to admit it.
+
 ## Audience
 
 sitserve is for private use by a few invited people, so nobody else spends the upstream allowance.
@@ -178,6 +193,13 @@ paths, plus languages and course type IDs. Search location 1699 has no directory
 a non-center. `import-fixtures.js` rebuilds the fixtures above from a folder of saved responses,
 keeping the existing oracle. No flag or photo is downloaded during development.
 
+The icons in `web/icons/` are sutamaya's leaf icons with "OS" lettered over them. Playwright's
+Chrome renders them from a sutamaya.org checkout, which it only reads:
+
+```sh
+NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/make-icons.cjs ../sutamaya.org
+```
+
 ## Deployment
 
 `npm run deploy` deploys the `production` environment: live mode on the custom domain
@@ -185,6 +207,9 @@ keeping the existing oracle. No flag or photo is downloaded during development.
 Access. The Access application for that hostname, which admits only listed email addresses and
 sets the login methods, is configured in the Cloudflare Zero Trust dashboard, not this repository.
 `UPSTREAM_CONTACT` is a Worker secret (`wrangler secret put UPSTREAM_CONTACT --env production`).
+If a browser installs the app without its icon, it fetched the icons without the Access cookie; an
+Access bypass policy for `/manifest.webmanifest` and `/icons/*` admits them without exposing
+anything private.
 
 Still to do: tune spacing, allowances, timeout and slow thresholds from logs, and decide the
 metadata refresh cadence.

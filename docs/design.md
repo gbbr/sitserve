@@ -240,3 +240,15 @@ city, short name, subdomain and codes such as "WA" or "IN".
 - Sticky offsets are re-measured whenever the filter bar or list resizes, including across the
   breakpoint. They keep fractional pixel heights, and adjacent sticky layers overlap by 1px so
   rows can't peek through a rounding gap between the filters, column headings and month headings.
+
+## Installed app
+
+- **Install**: browsers offer to install sitserve to the home screen or desktop, where it opens
+  in its own window and reruns the last submitted search.
+- **Icon**: sutamaya's gold leaf with "OS" in large ivory letters. As in sutamaya, the leaf
+  stands upright in the manifest icons and leans in the Apple touch icon and favicons.
+- **Theme color**: the browser's and installed app's bars take the page background, following
+  the theme switch.
+- **Offline**: the page still opens with its filters. A search that can't connect says "You're
+  offline." or, when the browser believes it's online, "Couldn't connect to sitserve.", followed
+  by "Press Search to retry."

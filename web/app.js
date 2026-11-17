@@ -544,7 +544,9 @@ async function searchCourses() {
   closePlaces(); render(); updateSearchStatus();
   let reader;
   try {
-    const response = await fetch('/api/search?' + serializeFilters(f, { today: TODAY, includeDefaults: true }), { signal: active.signal, headers: { 'X-Sitserve-Search-Id': active.id } });
+    // A failed connection rejects with a TypeError worded differently by each browser.
+    const response = await fetch('/api/search?' + serializeFilters(f, { today: TODAY, includeDefaults: true }), { signal: active.signal, headers: { 'X-Sitserve-Search-Id': active.id } })
+      .catch(e => { throw active.signal.aborted ? e : new Error(navigator.onLine === false ? "You're offline." : "Couldn't connect to sitserve."); });
     if (!response.ok) throw new Error((await response.json()).message || `Search failed (${response.status}).`);
     reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -788,20 +790,22 @@ function showThemeButton() {
   themeButton.dataset.tip = label;
   themeButton.setAttribute('aria-label', label);
 }
+// theme-color colors the browser's and installed app's bars to match the page background.
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  showThemeButton();
+}
 themeButton.addEventListener('click', () => {
   hideTip();
   const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = theme;
+  setTheme(theme);
   try { localStorage.setItem('theme', theme); } catch { /* the choice lasts until reload */ }
-  showThemeButton();
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
   let saved = null;
   try { saved = localStorage.getItem('theme'); } catch { /* no saved choice */ }
-  if (!saved) {
-    document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
-    showThemeButton();
-  }
+  if (!saved) setTheme(e.matches ? 'dark' : 'light');
 });
 showThemeButton();
 
@@ -822,3 +826,6 @@ setFilters(restoreLastSearch ? lastSearch : fromFragment());
 updateSearchStatus();
 render();
 if (restoreLastSearch) void searchCourses();
+
+// The service worker lets the installed app open offline (sw.js); the page works without one.
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));

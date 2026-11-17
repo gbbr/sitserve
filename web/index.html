@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>sitserve · Vipassana courses</title>
+<!-- Cloudflare Access admits the manifest request only with cookies, which use-credentials sends. -->
+<link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<!-- iPadOS offers to add a standalone app, rather than a bookmark, only with these Apple tags. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="sitserve">
+<meta name="theme-color" content="#f7f1e5">
 <style>
   :root {
     color-scheme: light;
@@ -404,11 +414,13 @@
   }
 </style>
 <script>
-  // Set the theme before the page paints: the viewer's last choice, else the system's.
+  // Set the theme before the page paints: the viewer's last choice, else the system's. The browser
+  // and installed app color their bars from theme-color, which follows the page background.
   {
     let saved = null;
     try { saved = localStorage.getItem('theme'); } catch { /* storage blocked: follow the system */ }
     document.documentElement.dataset.theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   }
 </script>
 </head>
