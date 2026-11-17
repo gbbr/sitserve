@@ -275,6 +275,7 @@
   .kind.noncenter { background: var(--noncenter); }
   .dates { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .dates .end { opacity: .4; }
+  .dates .mon { display: inline-block; min-width: 2em; } /* fits May, the widest month */
   .type { display: flex; align-items: center; justify-content: center; min-width: 0; color: var(--muted); font-size: 12px; }
   .type > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .type-code { display: inline-block; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; line-height: 16px; }
@@ -398,7 +399,7 @@
     [data-column=lights] { order: 2; }
     [data-column=dates], [data-column=type], [data-column=apply] { order: 4; }
     [data-column=apply] { margin-left: auto; }
-    .dates { min-width: 92px; color: var(--muted); font-size: 13px; }
+    .dates { min-width: 8.2em; color: var(--muted); font-size: 13px; } /* fits "Apr 28 – May 10", so type badges line up */
     .type-code { padding: 0 5px; font-size: 11.5px; line-height: 17px; }
     .lights { gap: 8px; align-self: auto; margin-left: auto; }
     .grp { grid-template-columns: 12px 12px; }

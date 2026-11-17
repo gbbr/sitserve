@@ -303,10 +303,11 @@ list.addEventListener('keydown', e => {
 
 const ymd = s => s.split('-').map(Number);
 // dateRange leaves out the year, which the year headings show: "Nov 18 – 29", "Nov 25 – Dec 6".
-// The end is faded so the start date stands out.
+// The start's month sits in a fixed-width slot, so months and days line up down the list. The
+// end is faded so the start date stands out.
 function dateRange(a, b) {
   const [, am, ad] = ymd(a), [, bm, bd] = ymd(b);
-  const start = `${MON[am - 1]} ${ad}`;
+  const start = `<span class="mon">${MON[am - 1]}</span> ${ad}`;
   if (a === b) return start;
   return `${start}<span class="end"> – ${am === bm ? bd : `${MON[bm - 1]} ${bd}`}</span>`;
 }

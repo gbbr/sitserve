@@ -128,7 +128,8 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
        The photo is requested only then, so passing over names costs no upstream requests.
        Clicking the name opens the location's website.
   2. **Dates**: "Nov 18 – 29" or "Nov 25 – Dec 6", without the year (the year heading has it).
-     The end is faded so the start stands out; hovering shows full dates with weekdays.
+     The start's months and days line up down the list. The end is faded so the start stands
+     out; hovering shows full dates with weekdays.
   3. **Type**: a compact badge with the chip code, centered under a centered heading; see
      [Type badges](#type-badges). Hovering shows the full name and, on a second line, the
      languages.
