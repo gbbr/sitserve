@@ -1,60 +1,66 @@
-// Renders sitserve's icons into web/icons/: sutamaya's leaf with "OS" lettered over it. The
-// artwork comes from a sutamaya.org checkout, which is read and never changed:
+// Renders sitserve's icons into web/icons/: the header's dhamma wheel with "OS" lettered over it.
 //
-//   NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/make-icons.cjs ../sutamaya.org
+//   NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/make-icons.cjs
 //
-// Each icon starts from the sutamaya icon made for the same use, so the leaf stands upright in
-// the manifest icons and leans in the Apple touch icon and favicons, as it does in sutamaya.
-// Chrome draws the letters on a canvas at each icon's own size; the PNGs are committed.
+// Chrome draws each icon on a canvas at its own size from web/assets/wheel/dhamma-wheel.svg; the
+// PNGs are committed.
 const { existsSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
 
-// `x` and `y` place the center of the letters' ink and `font` sets their size, all as fractions
-// of the icon, to sit them on the widest part of each leaf. The maskable icon keeps the letters
-// inside its safe zone, the central circle that every launcher mask leaves visible. Favicons
-// trade the soft shadow, which blurs away at those sizes, for a dark outline.
+// `wheel` is the wheel's height and `font` the letters' size, as fractions of the icon. The gold
+// wheel sits on a dark tile, which launchers crop to their own shape; the maskable icon keeps the
+// wheel inside its safe zone, the central circle that every launcher mask leaves visible. Favicons
+// round the tile's corners themselves and drop the letters' soft shadow, which blurs away at
+// those sizes.
 const ICONS = [
-  { out: 'icon-512.png', size: 512, source: 'web/public/icons/icon-512-v2.png', x: .5, y: .6, font: .4 },
-  { out: 'icon-192.png', size: 192, source: 'web/public/icons/icon-192-v2.png', x: .5, y: .6, font: .4 },
-  { out: 'icon-512-maskable.png', size: 512, source: 'web/public/icons/icon-512-maskable-v2.png', x: .5, y: .58, font: .34 },
-  { out: 'apple-touch-icon.png', size: 180, source: 'web/public/icons/apple-touch-icon.png', x: .52, y: .52, font: .38 },
-  { out: 'favicon-32.png', size: 32, source: 'web/public/favicon-32-v3.png', x: .5, y: .52, font: .5, outline: true },
-  { out: 'favicon-16.png', size: 16, source: 'web/public/favicon-16-v3.png', x: .5, y: .53, font: .58, outline: true },
+  { out: 'icon-512.png', size: 512, wheel: .82, font: .36 },
+  { out: 'icon-192.png', size: 192, wheel: .82, font: .36 },
+  { out: 'icon-512-maskable.png', size: 512, wheel: .7, font: .3 },
+  { out: 'apple-touch-icon.png', size: 180, wheel: .82, font: .36 },
+  { out: 'favicon-32.png', size: 32, wheel: .94, font: .46, favicon: true },
+  { out: 'favicon-16.png', size: 16, wheel: .94, font: .56, favicon: true },
 ];
 
 async function main() {
-  const sutamaya = process.argv[2];
-  if (!sutamaya) throw new Error('Usage: node web/tools/make-icons.cjs /path/to/sutamaya.org');
   const outDir = path.join(__dirname, '..', 'icons');
   mkdirSync(outDir, { recursive: true });
+  // A data URL keeps the canvas untainted, so it can be exported.
+  const art = 'data:image/svg+xml;base64,' + readFileSync(path.join(__dirname, '..', 'assets', 'wheel', 'dhamma-wheel.svg')).toString('base64');
   const macChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || (existsSync(macChrome) ? macChrome : undefined) });
   try {
     const page = await browser.newPage();
     for (const icon of ICONS) {
-      // A data URL keeps the canvas untainted, so it can be exported.
-      const art = 'data:image/png;base64,' + readFileSync(path.join(sutamaya, icon.source)).toString('base64');
-      const png = await page.evaluate(async ({ art, size, x, y, font, outline }) => {
+      const png = await page.evaluate(async ({ art, size, wheel, font, favicon }) => {
         const image = new Image();
         image.src = art;
         await image.decode();
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(image, 0, 0, size, size);
+        // A dark warm tile, lit from above in the wheel's gold.
+        ctx.beginPath();
+        ctx.roundRect(0, 0, size, size, favicon ? size * .2 : 0);
+        ctx.clip();
+        const base = ctx.createLinearGradient(0, 0, 0, size);
+        base.addColorStop(0, '#2c2118');
+        base.addColorStop(1, '#120d09');
+        ctx.fillStyle = base;
+        ctx.fill();
+        const glow = ctx.createRadialGradient(size / 2, 0, 0, size / 2, 0, size * .9);
+        glow.addColorStop(0, 'rgba(183, 135, 48, .45)');
+        glow.addColorStop(1, 'rgba(183, 135, 48, 0)');
+        ctx.fillStyle = glow;
+        ctx.fill();
+        const h = wheel * size, w = h * image.naturalWidth / image.naturalHeight;
+        ctx.drawImage(image, (size - w) / 2, (size - h) / 2, w, h);
         ctx.font = `800 ${font * size}px -apple-system, system-ui, sans-serif`;
         ctx.letterSpacing = `${-font * size * .02}px`;
         const m = ctx.measureText('OS');
-        const left = x * size - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
-        const baseline = y * size + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-        if (outline) {
-          ctx.lineJoin = 'round';
-          ctx.lineWidth = size / 10;
-          ctx.strokeStyle = 'rgba(28, 18, 6, .85)';
-          ctx.strokeText('OS', left, baseline);
-        } else {
+        const left = size / 2 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+        const baseline = size / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+        if (!favicon) {
           for (const [blur, offset, alpha] of [[.05, .014, .55], [.012, .004, .4]]) {
             ctx.shadowColor = `rgba(0, 0, 0, ${alpha})`;
             ctx.shadowBlur = blur * size;

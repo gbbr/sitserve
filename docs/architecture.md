@@ -193,11 +193,11 @@ paths, plus languages and course type IDs. Search location 1699 has no directory
 a non-center. `import-fixtures.js` rebuilds the fixtures above from a folder of saved responses,
 keeping the existing oracle. No flag or photo is downloaded during development.
 
-The icons in `web/icons/` are sutamaya's leaf icons with "OS" lettered over them. Playwright's
-Chrome renders them from a sutamaya.org checkout, which it only reads:
+The icons in `web/icons/` are the header's dhamma wheel with "OS" lettered over it. Playwright's
+Chrome renders them from `web/assets/wheel/dhamma-wheel.svg`:
 
 ```sh
-NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/make-icons.cjs ../sutamaya.org
+NODE_PATH=/tmp/sit-web-test/node_modules node web/tools/make-icons.cjs
 ```
 
 ## Deployment

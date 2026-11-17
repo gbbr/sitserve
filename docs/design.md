@@ -245,8 +245,8 @@ city, short name, subdomain and codes such as "WA" or "IN".
 
 - **Install**: browsers offer to install sitserve to the home screen or desktop, where it opens
   in its own window and reruns the last submitted search.
-- **Icon**: sutamaya's gold leaf with "OS" in large ivory letters. As in sutamaya, the leaf
-  stands upright in the manifest icons and leans in the Apple touch icon and favicons.
+- **Icon**: the header's gold dhamma wheel on a dark tile, with "OS" in large ivory letters over
+  it. Favicons round the tile's corners.
 - **Theme color**: the browser's and installed app's bars take the page background, following
   the theme switch.
 - **Offline**: the page still opens with its filters. A search that can't connect says "You're
