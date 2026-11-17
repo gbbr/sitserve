@@ -213,7 +213,7 @@ document.addEventListener('pointerdown', e => { if (!e.target.closest('#where-bo
 const DISPLAY_COLUMNS = {
   location: { label: 'Location', width: 'minmax(0, 1fr)' },
   dates: { label: 'Dates', width: '120px' },
-  type: { label: 'Type', width: '124px' },
+  type: { label: 'Type', width: '69px' },
   lights: { label: 'Availability', width: '108px' },
   apply: { label: 'Schedule', width: '84px' },
 };
@@ -381,7 +381,7 @@ function rowHTML(c, avail, f) {
   const cells = {
     location: `<span class="who" data-column="location"><span class="flag" role="img" aria-label="${esc(l.venue ? `${l.venue}, ${l.place}` : l.place)}" data-tip="${esc(l.venue ? `${l.venue}\n${l.place}` : l.place)}">${flag(l.cc)}</span>${l.web ? `<a class="name" href="${esc(l.web)}" target="_blank" rel="noopener"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</a>` : `<span class="name"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</span>`}${l.center ? '' : '<span class="kind noncenter" data-tip="non-center"></span>'}</span>`,
     dates: `<span class="dates" data-column="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>`,
-    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}${BADGE_TONES.get(c.type).solid ? ' solid' : ''}" style="--shade: ${BADGE_TONES.get(c.type).shade}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span>${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
+    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}${BADGE_TONES.get(c.type).solid ? ' solid' : ''}" style="--shade: ${BADGE_TONES.get(c.type).shade}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).badge)}</span>${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
     lights: `<span class="lights" data-column="lights">${lightCells}</span>`,
     apply: `<span class="reg" data-column="apply"${soon ? ` data-tip="Registration opens ${esc(longDate(c.enroll))}"` : ''}>${reg}</span>`,
   };

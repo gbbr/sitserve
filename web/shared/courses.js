@@ -10,22 +10,23 @@ export const COVERS = { m: ['NM', 'OM'], w: ['NF', 'OF'], s: ['SM', 'SF'], nm: [
 export const specificity = s => (s.type == null ? 0 : s.type.length === 1 ? 1 : 2);
 export const LIGHTS = { Green: 'g', Yellow: 'y', Orange: 'o', Red: 'r' };
 
-// Course types the page covers: dhamma.org's raw_course_type code, short and full name.
+// Course types the page covers: dhamma.org's raw_course_type code, short name (filters and links),
+// full name, search ID and the shorter code on result badges.
 export const TYPES = [
-  ['10-Day', '10D', '10-day', 3],
-  ['10-DayOSC', '10D OS', '10-day for old students', 28],
-  ['10-DaySpecial', '10D SPCL', 'Special 10-day', 6],
-  ['14-DayGratitude', '14D', '14-day gratitude course', 66],
-  ['20-DayOSC', '20D', '20-day', 4],
-  ['30-DayOSC', '30D', '30-day', 11],
-  ['45-DayOSC', '45D', '45-day', 12],
-  ['60-DayOSC', '60D', '60-day', 23],
-  ['TSC', 'TSC', "Teacher's self course", 21],
-  ['10-DayExecutive', 'EXEC', 'Executive course', 1],
-  ['Satipatthana', 'STP', 'Satipaṭṭhāna Sutta course', 10],
-  ['3-DayOSC', '3D', '3-day', 9],
+  ['10-Day', '10D', '10-day', 3, '10'],
+  ['10-DayOSC', '10D OS', '10-day for old students', 28, '10OS'],
+  ['10-DaySpecial', '10D SPCL', 'Special 10-day', 6, '10S'],
+  ['14-DayGratitude', '14D', '14-day gratitude course', 66, '14'],
+  ['20-DayOSC', '20D', '20-day', 4, '20'],
+  ['30-DayOSC', '30D', '30-day', 11, '30'],
+  ['45-DayOSC', '45D', '45-day', 12, '45'],
+  ['60-DayOSC', '60D', '60-day', 23, '60'],
+  ['TSC', 'TSC', "Teacher's self course", 21, 'TSC'],
+  ['10-DayExecutive', 'EXEC', 'Executive course', 1, '10E'],
+  ['Satipatthana', 'STP', 'Satipaṭṭhāna Sutta course', 10, 'STP'],
+  ['3-DayOSC', '3D', '3-day', 9, '3'],
 ];
-export const TYPE = new Map(TYPES.map(([raw, short, name, id]) => [raw, { short, name, id }]));
+export const TYPE = new Map(TYPES.map(([raw, short, name, id, badge]) => [raw, { short, name, id, badge }]));
 // Course types that take new students; the others are for old students only.
 export const NEW_STUDENT_TYPES = new Set(['10-Day', '10-DayExecutive']);
 export const LONG_TYPES = new Set(['10-DaySpecial', '20-DayOSC', '30-DayOSC', '45-DayOSC', '60-DayOSC']);

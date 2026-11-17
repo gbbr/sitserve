@@ -232,10 +232,14 @@ async function main() {
         return img.naturalWidth > 0 && Math.abs(img.naturalWidth / img.naturalHeight - 4 / 3) < .01
           && rect.width === 16 && rect.height === 12;
       })));
-      assert.ok(await page.locator('.row[data-id] .type').evaluateAll(cells => cells.some(cell => cell.querySelector('.note')) && cells.every(cell => {
-        const center = r => r.left + r.width / 2, badge = cell.querySelector('.type-code').getBoundingClientRect(), note = cell.querySelector('.note')?.getBoundingClientRect();
-        return Math.abs(center(badge) - center(cell.getBoundingClientRect())) < 1 && (!note || (note.left >= badge.right && note.right <= cell.getBoundingClientRect().right));
-      })), 'badges stay centered with the notes icon beside them');
+      assert.ok(await page.locator('.row[data-id] .type').evaluateAll(cells => {
+        const center = r => r.left + r.width / 2, head = document.querySelector('.column-head[data-column=type] .head-label').getBoundingClientRect();
+        return cells.some(cell => cell.querySelector('.note')) && cells.some(cell => !cell.querySelector('.note')) && cells.every(cell => {
+          const box = cell.getBoundingClientRect(), badge = cell.querySelector('.type-code'), note = cell.querySelector('.note')?.getBoundingClientRect();
+          return Math.abs(center(badge.getBoundingClientRect()) - center(head)) < 1 && badge.scrollWidth <= badge.clientWidth
+            && (!note || (note.left >= badge.getBoundingClientRect().right && note.right <= box.right));
+        });
+      }), 'badges fit and line up under the heading, with the notes icon beside them');
       assert.ok(await page.locator('.filter-row').evaluateAll(rows => rows.every(row => {
         const cells = [...row.children].filter(el => !el.hidden).map(el => el.getBoundingClientRect());
         return cells.every(r => Math.abs(r.top + r.height / 2 - cells[0].top - cells[0].height / 2) < 1);
@@ -325,7 +329,7 @@ async function main() {
       const combinedIDs = expected.combined;
       await page.locator('#types').getByText('14D/TSC', { exact: true }).click();
       await submit();
-      await page.waitForFunction(() => [...document.querySelectorAll('.type-code')].every(el => ['14D', 'TSC'].includes(el.textContent)));
+      await page.waitForFunction(() => [...document.querySelectorAll('.type-code')].every(el => ['14', 'TSC'].includes(el.textContent)));
       assert.deepEqual(await rowIDs(), combinedIDs);
       await reload();
       assert.equal(await page.locator('[name=types][value="14D/TSC"]').isChecked(), true);
@@ -475,7 +479,9 @@ async function main() {
       assert.deepEqual(await pressed(), ['dates']);
       const byDate = await years();
       const chips = await page.locator('#types input').evaluateAll(inputs => inputs.map(i => i.value));
-      const rank = code => chips.indexOf(['14D', 'TSC'].includes(code) ? '14D/TSC' : code);
+      const { TYPES, filterTypeCode } = await import('../shared/courses.js');
+      const chipFor = new Map(TYPES.map(([raw, , , , badge]) => [badge, filterTypeCode(raw)]));
+      const rank = code => chips.indexOf(chipFor.get(code));
       const expected = byDate.map(rows => [...rows].sort((a, b) => rank(a[1]) - rank(b[1])));
       assert.notDeepEqual(expected, byDate, 'fixture needs a year whose date and type orders differ');
       await page.locator('.column-head[data-column=type]').click();
@@ -534,6 +540,8 @@ async function main() {
 
     await check('phone rows take two lines and the collapsed summary wraps after the wheel', async () => {
       await page.setViewportSize({ width: 360, height: 800 });
+      // Phone rows ignore the saved desktop order: dates, type, then Apply.
+      await page.evaluate(() => localStorage.setItem('sit.columns', JSON.stringify(['location', 'type', 'apply', 'dates', 'lights'])));
       await load('from=2026-12-01&types=20D,30D,45D,60D,10D%20SPCL');
       const rows = await page.evaluate(() => [...document.querySelectorAll('.row[data-id]')].map(row => {
         const box = k => row.querySelector(`[data-column=${k}]`).getBoundingClientRect();
@@ -545,15 +553,17 @@ async function main() {
           line1: spread([location, lights]),
           line2: spread([dates, type, apply]),
           stacked: Math.min(dates.top, type.top, apply.top) >= Math.max(location.bottom, lights.bottom) - 1,
+          ordered: dates.right <= type.left && type.right <= apply.left,
           applyInset: r.right - apply.right, lightsInset: r.right - lights.right,
           button: row.querySelector('[data-column=apply] > a').innerText,
           noteGap: (note => note ? note.getBoundingClientRect().left - row.querySelector('.type-code').getBoundingClientRect().right : 6)(row.querySelector('.note')),
           soon: !!soon,
         };
       }));
+      await page.evaluate(() => localStorage.removeItem('sit.columns'));
       assert.ok(rows.length > 3 && rows.some(r => r.soon), 'fixture needs a course that is not open yet');
       for (const r of rows) {
-        assert.ok(r.height < 70 && r.line1 < 2 && r.line2 < 2 && r.stacked, `two lines: ${JSON.stringify(r)}`);
+        assert.ok(r.height < 70 && r.line1 < 2 && r.line2 < 2 && r.stacked && r.ordered, `two lines: ${JSON.stringify(r)}`);
         assert.ok(Math.abs(r.applyInset - 12) < 1 && Math.abs(r.lightsInset - 12) < 1, `edges: ${JSON.stringify(r)}`);
         if (r.soon) assert.match(r.button, /^\d+ [A-Z][a-z]{2}$/); else assert.equal(r.button, 'Apply');
         assert.ok(Math.abs(r.noteGap - 6) < 1, `notes icon beside the type: ${JSON.stringify(r)}`);

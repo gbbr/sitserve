@@ -31,7 +31,8 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
   | 20D / 30D / 45D / 60D | 20/30/45/60-day | `20-DayOSC` … `60-DayOSC` | 4 / 11 / 12 / 23 | violet |
 
   `14D/TSC` matches both upstream types, and links with `types=14D` or `types=TSC` restore it.
-  Rows keep their own 14D or TSC code and full name.
+  Result badges use shorter codes: 3, 10, 10OS, 10S, 10E (Executive), 14, 20, 30, 45 and 60,
+  with STP and TSC unchanged. Rows keep their own 14 or TSC code and full name.
 - **As**: anyone, or new / old / server × male / female. Choosing a position narrows "can sign up"
   to it, enlarges its lights and dims the others; column backgrounds, headings and the legend
   don't change. The control shows the position's short code (NM, NF, OM, OF, DWM and DWF for
@@ -130,8 +131,9 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
   2. **Dates**: "Nov 18 – 29" or "Nov 25 – Dec 6", without the year (the year heading has it).
      The start's months and days line up down the list. The end is faded so the start stands
      out; hovering shows full dates with weekdays.
-  3. **Type**: a compact badge with the chip code, centered under a centered heading; see
-     [Type badges](#type-badges). Hovering shows the full name and, on a second line, the
+  3. **Type**: a compact badge with a short code, centered under the heading; see
+     [Type badges](#type-badges). The column is as wide as the widest badge plus the notes icon.
+     Hovering shows the full name and, on a second line, the
      languages. The notes icon follows the badge when comments exist; it toggles an inline
      panel under the row with the comments (sanitized by the Worker and again in the browser),
      languages, and the location's own course label when it says more than the standard type.

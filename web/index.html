@@ -238,7 +238,7 @@
 
   /* Course list: one grid row per course */
   main { max-width: 1180px; margin: 0 auto; padding: 0 16px 32px; }
-  .row { display: grid; grid-template-columns: var(--columns, minmax(0, 1fr) 120px 124px 108px 84px); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: var(--columns, minmax(0, 1fr) 120px 69px 108px 84px); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
   @media (hover: hover) { .row:not(.head):hover { background: var(--hover); } }
   .head { position: sticky; top: calc(var(--bar-h, 0px) - 1px); z-index: 5; padding-top: 3px; padding-bottom: 3px; border-bottom-color: var(--header-line); background: var(--header-bg); box-shadow: 0 0 0 100vmax var(--header-bg); clip-path: inset(0 -100vmax); color: var(--header-fg); }
   .head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--header-line); box-shadow: 0 0 0 100vmax var(--header-line); clip-path: inset(0 -100vmax); pointer-events: none; }
@@ -248,6 +248,7 @@
   @media (hover: hover) { .column-head:hover { color: var(--fg); } }
   .column-head:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   .column-head[data-column=type], .column-head[data-column=apply] { justify-content: center; }
+  .column-head[data-column=type] { padding-right: 25px; } /* centers the label over the badges, clear of the notes track */
   /* Dates and Type sort the rows. A chevron beside the label marks the active sort and hints at the
      other on hover; it sits outside the label's box so centered labels stay aligned with their column. */
   .column-head.sortable { cursor: pointer; }
@@ -276,14 +277,15 @@
   .dates { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .dates .end { opacity: .4; }
   .dates .mon { display: inline-block; min-width: 2em; } /* fits May, the widest month */
-  /* The badge stays centered in its column, with the notes icon in the right-hand track. */
-  .type { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 3px; min-width: 0; color: var(--muted); font-size: 12px; }
-  .type .type-code { grid-column: 2; }
-  .type .note { grid-column: 3; justify-self: start; }
+  /* The column fits the widest badge and the notes icon. Badges center in the first track and the
+     icon has its own, so badges line up whether or not a row has notes. */
+  .type { display: grid; grid-template-columns: minmax(0, 1fr) 22px; align-items: center; column-gap: 3px; min-width: 0; color: var(--muted); font-size: 12px; }
+  .type .type-code { justify-self: center; }
+  .type .note { grid-column: 2; }
   .type > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .type-code { display: inline-block; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; line-height: 16px; }
   /* Result badges. Within a color group, types in filter order run from light tints to solid
-     fills (--shade picks a point on each), so like-colored types such as 20D and 60D stand apart. */
+     fills (--shade picks a point on each), so like-colored types such as 20 and 60 stand apart. */
   .type-code { background: color-mix(in oklch, var(--tint-a), var(--tint-b) calc(var(--shade, 0) * 100%)); color: var(--ink); }
   .type-code.solid { background: color-mix(in oklch, var(--solid-a), var(--solid-b) calc(var(--shade, 0) * 100%)); color: var(--bg); }
   .type-code.regular { --tint-a: var(--regular-tint-a); --tint-b: var(--regular-tint-b); --solid-a: var(--regular-solid-a); --solid-b: var(--regular-solid-b); --ink: var(--regular-ink); }
@@ -396,7 +398,9 @@
     .head .l.hl { color: var(--fg); }
     [data-column=location] { order: 0; max-width: calc(100% - 150px); }
     [data-column=lights] { order: 2; }
-    [data-column=dates], [data-column=type], [data-column=apply] { order: 4; }
+    [data-column=dates] { order: 4; }
+    [data-column=type] { order: 5; }
+    [data-column=apply] { order: 6; }
     [data-column=apply] { margin-left: auto; }
     .dates { min-width: 8.2em; color: var(--muted); font-size: 13px; } /* fits "Apr 28 – May 10", so type badges line up */
     .type { display: flex; gap: 6px; }
