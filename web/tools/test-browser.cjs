@@ -457,28 +457,28 @@ async function main() {
       await reload();
     });
 
-    await check('Type and Dates headings sort rows within each month and the choice persists', async () => {
-      // Each month's rows as [id, type code], in display order.
-      const months = () => page.locator('#list .month').evaluateAll(sections => sections.map(section =>
+    await check('Type and Dates headings sort rows within each year and the choice persists', async () => {
+      // Each year's rows as [id, type code], in display order.
+      const years = () => page.locator('#list .year').evaluateAll(sections => sections.map(section =>
         [...section.querySelectorAll('.row[data-id]')].map(row => [row.dataset.id, row.querySelector('.type-code').textContent])));
       const pressed = () => page.locator('.column-head.sortable').evaluateAll(els => els.filter(el => el.getAttribute('aria-pressed') === 'true').map(el => el.dataset.column));
       assert.deepEqual(await page.locator('.column-head.sortable').evaluateAll(els => els.map(el => el.dataset.column).sort()), ['dates', 'type']);
       assert.deepEqual(await pressed(), ['dates']);
-      const byDate = await months();
+      const byDate = await years();
       const chips = await page.locator('#types input').evaluateAll(inputs => inputs.map(i => i.value));
       const rank = code => chips.indexOf(['14D', 'TSC'].includes(code) ? '14D/TSC' : code);
       const expected = byDate.map(rows => [...rows].sort((a, b) => rank(a[1]) - rank(b[1])));
-      assert.notDeepEqual(expected, byDate, 'fixture needs a month whose date and type orders differ');
+      assert.notDeepEqual(expected, byDate, 'fixture needs a year whose date and type orders differ');
       await page.locator('.column-head[data-column=type]').click();
       assert.deepEqual(await pressed(), ['type']);
-      assert.deepEqual(await months(), expected);
+      assert.deepEqual(await years(), expected);
       assert.equal(await page.locator('.column-head[data-column=type]').evaluate(el => el === document.activeElement), true);
       assert.equal(await page.locator('.column-head[data-column=type] svg').evaluate(el => getComputedStyle(el).opacity), '1');
       await reload();
-      assert.deepEqual(await months(), expected);
+      assert.deepEqual(await years(), expected);
       await page.locator('.column-head[data-column=dates]').press('Enter');
       assert.deepEqual(await pressed(), ['dates']);
-      assert.deepEqual(await months(), byDate);
+      assert.deepEqual(await years(), byDate);
       await page.evaluate(() => localStorage.removeItem('sit.sort'));
     });
 
@@ -525,7 +525,7 @@ async function main() {
 
     await check('phone rows take two lines and the collapsed summary wraps after the wheel', async () => {
       await page.setViewportSize({ width: 360, height: 800 });
-      await load('from=2027-01-10&types=20D,30D,45D,60D,10D%20SPCL');
+      await load('from=2026-12-01&types=20D,30D,45D,60D,10D%20SPCL');
       const rows = await page.evaluate(() => [...document.querySelectorAll('.row[data-id]')].map(row => {
         const box = k => row.querySelector(`[data-column=${k}]`).getBoundingClientRect();
         const spread = boxes => Math.max(...boxes.map(b => b.top + b.height / 2)) - Math.min(...boxes.map(b => b.top + b.height / 2));
@@ -548,7 +548,7 @@ async function main() {
         assert.equal(r.button, 'Apply');
         if (r.soon) assert.match(r.soon, /^Opens \d+ [A-Z][a-z]{2}$/);
       }
-      // One lights key sits over the lights' fixed slots; month headings carry none.
+      // One lights key sits over the lights' fixed slots; year headings carry none.
       const offsets = await page.evaluate(() => {
         const row = [...document.querySelectorAll('.row[data-id]')].find(r => !r.querySelector('.soon'));
         const centers = els => [...els].map(el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; });
@@ -558,29 +558,30 @@ async function main() {
       assert.equal(offsets.length, 6);
       assert.ok(offsets.every(d => d < .5), `key offsets ${offsets}`);
       assert.equal(await page.locator('h2 .l').count(), 0);
-      // The key shares one sticky band with the month heading stuck at the top of the viewport.
+      // The key shares one sticky band with the year heading stuck at the top of the viewport.
       const position = await page.evaluate(() => Math.min(600, document.documentElement.scrollHeight - innerHeight));
       await page.evaluate(position => scrollTo(0, position), position);
       await page.waitForFunction(position => scrollY === position, position);
       const sticky = await page.evaluate(() => {
         const head = document.querySelector('.head').getBoundingClientRect();
-        const month = [...document.querySelectorAll('h2')].filter(h => h.getBoundingClientRect().top < 1).at(-1).getBoundingClientRect();
+        const year = [...document.querySelectorAll('h2')].filter(h => h.getBoundingClientRect().top < 1).at(-1).getBoundingClientRect();
         const key = document.querySelector('.head .lights').getBoundingClientRect();
-        // The band has the column headings' color; month headings further down are dimmer.
+        // The band has the column headings' color; year headings further down are dimmer.
         const band = getComputedStyle(document.querySelector('.head')).backgroundColor;
-        const below = [...document.querySelectorAll('.month')].find(m => m.getBoundingClientRect().top > head.bottom);
+        const below = [...document.querySelectorAll('.year')].find(y => y.getBoundingClientRect().top > head.bottom);
         const root = getComputedStyle(document.documentElement);
         return {
-          headTop: head.top, monthTop: month.top, keyInside: key.top >= month.top && key.bottom <= month.bottom,
+          headTop: head.top, yearTop: year.top, keyInside: key.top >= year.top && key.bottom <= year.bottom,
           band, header: root.getPropertyValue('--header-bg'), below: below && getComputedStyle(below, '::before').backgroundColor,
-          dim: root.getPropertyValue('--month-bg'), monthOwn: getComputedStyle(document.querySelector('h2')).backgroundColor,
+          dim: root.getPropertyValue('--year-bg'), yearOwn: getComputedStyle(document.querySelector('h2')).backgroundColor,
         };
       });
-      assert.ok(sticky.headTop === 0 && sticky.monthTop === 0 && sticky.keyInside, JSON.stringify(sticky));
+      assert.ok(sticky.headTop === 0 && sticky.yearTop === 0 && sticky.keyInside, JSON.stringify(sticky));
       const rgb = hex => `rgb(${hex.trim().match(/\w\w/g).map(h => parseInt(h, 16)).join(', ')})`;
       assert.equal(sticky.band, rgb(sticky.header));
+      assert.ok(sticky.below, 'fixture needs results in two years');
       assert.equal(sticky.below, rgb(sticky.dim));
-      assert.equal(sticky.monthOwn, 'rgba(0, 0, 0, 0)');
+      assert.equal(sticky.yearOwn, 'rgba(0, 0, 0, 0)');
       await page.evaluate(() => scrollTo(0, 0));
 
       await load('where=region_402&types=10D,20D,STP,3D&as=OM&lang=en&centers=1&wait=0');
@@ -617,17 +618,17 @@ async function main() {
           const dimensions = await page.evaluate(() => {
             const bar = document.querySelector('.bar').getBoundingClientRect();
             const head = document.querySelector('.head').getBoundingClientRect();
-            const month = document.querySelector('h2').getBoundingClientRect();
+            const year = document.querySelector('h2').getBoundingClientRect();
             const location = document.querySelector('.column-head[data-column=location]').getBoundingClientRect();
             const flag = document.querySelector('.row[data-id] .flag').getBoundingClientRect();
-            return { barGap: head.top - bar.bottom, monthGap: month.top - head.bottom, locationX: location.left, flagX: flag.left };
+            return { barGap: head.top - bar.bottom, yearGap: year.top - head.bottom, locationX: location.left, flagX: flag.left };
           });
           assert.ok(dimensions.barGap <= 0 && dimensions.barGap >= -1.1, `filter seam at ${width}px (${collapsed ? 'collapsed' : 'expanded'}): ${JSON.stringify(dimensions)}`);
-          assert.ok(dimensions.monthGap <= 0 && dimensions.monthGap >= -1.1, `month seam at ${width}px: ${JSON.stringify(dimensions)}`);
+          assert.ok(dimensions.yearGap <= 0 && dimensions.yearGap >= -1.1, `year seam at ${width}px: ${JSON.stringify(dimensions)}`);
           assert.equal(dimensions.locationX, dimensions.flagX);
         }
       }
-      assert.match(await page.locator('h2').first().textContent(), /^2026 November/);
+      assert.deepEqual(await page.locator('h2').evaluateAll(hs => hs.map(h => [h.firstChild.data, h.querySelector('.count').textContent])), [['2026', '50']]);
       if (process.env.SITSERVE_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SITSERVE_SCREENSHOT_DIR, 'sitserve-scroll.png') });
       await page.evaluate(() => scrollTo(0, 0));
       await expandFilters();

@@ -86,7 +86,7 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
 - **Before the first search**: only "Choose your filters and press Search to find up to 50
   matching courses." shows below the filters, and the footer stays hidden.
 - **Results**: rows appear as each page arrives. There's no summary line: column headings follow
-  the filter bar directly, month headings carry the counts, and a hidden status announces "N
+  the filter bar directly, year headings carry the counts, and a hidden status announces "N
   courses you can sign up for" to screen readers.
 - **Result limit**: up to 50 courses that pass every filter, with no pagination or Load more.
   A centered note after the last row explains where results stop: "Showing the first 50 matches;
@@ -97,18 +97,18 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
   list / closed lights), the dhamma.org credit, then "Checked 12 min ago · Requests to dhamma.org
   today (UTC): 37 pages, 5 photos" ("Simulated requests" in development). "Checked" uses the
   oldest page; the request counts update when a search finishes.
-- **Grouping and order**: rows are grouped by start month under year-first headings ("2026
-  NOVEMBER 63") aligned with the table's left edge. Within a month, rows sort by start date, then
-  name; clicking the Type heading sorts by course type in chip order (14D and TSC together), then
-  date and name, and Dates restores date order. The active heading is darker with a small
+- **Grouping and order**: rows are grouped by start year under headings ("2026 63") aligned with
+  the table's left edge. Within a year, rows sort by start date, then name; clicking the Type
+  heading sorts by course type in chip order (14D and TSC together), then date and name, and
+  Dates restores date order. The active heading is darker with a small
   chevron; the other shows a faint chevron on hover. The choice is stored in localStorage as
   `sit.sort`, and phones, which show only the lights' key, use it too.
-- **Headings**: column headings stick under the filter bar and month headings under them,
+- **Headings**: column headings stick under the filter bar and year headings under them,
   following the bar as it opens or collapses. Both heading bands span the full page width while
-  rows keep their constrained width; month headings are a dimmer shade of the column headings'
-  band, with their labels vertically centered. Each month is its own section, so an arriving
-  month heading pushes the stuck one away. NEW / OLD / SRV each have a fine rule above their
-  M / F labels, and month counts sit in a small muted pill.
+  rows keep their constrained width; year headings are a dimmer shade of the column headings'
+  band, with their labels vertically centered. Each year is its own section, so an arriving
+  year heading pushes the stuck one away. NEW / OLD / SRV each have a fine rule above their
+  M / F labels, and year counts sit in a small muted pill.
 - **Rows**: one compact line each on wide screens.
 - **Columns**, in default order, can be rearranged by dragging their headings (a marker shows
   which side the column will land on) or with Alt + Left/Right on a focused heading. The order is
@@ -127,7 +127,7 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
      - Resting on the name for 150 ms shows the location's photo with its full name and meaning.
        The photo is requested only then, so passing over names costs no upstream requests.
        Clicking the name opens the location's website.
-  2. **Dates**: "Nov 18 – 29" or "Nov 25 – Dec 6", without the year (the month heading has it).
+  2. **Dates**: "Nov 18 – 29" or "Nov 25 – Dec 6", without the year (the year heading has it).
      The end is faded so the start stands out; hovering shows full dates with weekdays.
   3. **Type**: a compact badge with the chip code, centered under a centered heading; see
      [Type badges](#type-badges). Hovering shows the full name and, on a second line, the
@@ -220,26 +220,25 @@ city, short name, subdomain and codes such as "WA" or "IN".
 
 ## Responsive layout
 
-- Above 820px: the full-width desktop grid with sticky filters, column headings and month
+- Above 820px: the full-width desktop grid with sticky filters, column headings and year
   headings. The phone layout never applies to wide screens.
 - At 820px and below, the filter bar scrolls with the page. Where shares the first line with the
   wheel and the two buttons; From, As and Lang share the next when they fit. Chips and checkboxes
   wrap, and a full-width Search ends the controls.
 - Phones keep only the lights column heading (NEW / OLD / SRV over M F), at the right of a band
-  in the column headings' color that sticks at the top of the viewport. The current month's label
-  sits at its left, so the month and the key share one band. Further down, month headings keep
+  in the column headings' color that sticks at the top of the viewport. The current year's label
+  sits at its left, so the year and the key share one band. Further down, year headings keep
   their dimmer band; as one arrives, its band slides under the sticky one and its label pushes
-  the previous month's out. Rows
-  run edge to edge with small insets, in two lines: the flag, name, schedule and notes icons, with
-  the lights at the right edge; then the dates, type and Apply. The lights sit in six fixed,
-  unlabeled slots under the key. A position a course doesn't offer leaves its slot empty,
-  so each position lines up down the list. Flex order keeps this arrangement independent of the
+  the previous year's out. Rows run edge to edge with small insets, in two lines: the flag, name,
+  schedule and notes icons, with the lights at the right edge; then the dates, type and Apply. The
+  lights sit in six fixed, unlabeled slots under the key. A position a course doesn't offer leaves
+  its slot empty, so each position lines up down the list. Flex order keeps this arrangement independent of the
   saved desktop column order.
 - No horizontal scrolling at phone widths; controls and suggestion panels stay within the
   viewport.
 - Sticky offsets are re-measured whenever the filter bar or list resizes, including across the
   breakpoint. They keep fractional pixel heights, and adjacent sticky layers overlap by 1px so
-  rows can't peek through a rounding gap between the filters, column headings and month headings.
+  rows can't peek through a rounding gap between the filters, column headings and year headings.
 
 ## Installed app
 

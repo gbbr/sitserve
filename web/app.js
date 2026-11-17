@@ -6,8 +6,7 @@ import { GROUPS, COLUMN_NAME, LIGHTS, TYPE, TYPES, FILTER_TYPES,
 // Use the viewer's local calendar date; a UTC conversion can shift it by a day.
 const now = new Date();
 const TODAY = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const MON = MONTHS.map(m => m.slice(0, 3));
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const svg = paths => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 const ICONS = {
@@ -233,9 +232,9 @@ function saveColumnOrder(next, moved) {
   $('#column-status').textContent = `${DISPLAY_COLUMNS[moved].label} moved to column ${next.indexOf(moved) + 1} of ${next.length}.`;
 }
 
-// Rows stay grouped by start month. Within a month they sort by start date, or by course type in
+// Rows stay grouped by start year. Within a year they sort by start date, or by course type in
 // chip order and then by date. The choice is stored in localStorage as `sit.sort`.
-const SORTS = { dates: 'date', type: 'type within each month' };
+const SORTS = { dates: 'date', type: 'type within each year' };
 const TYPE_RANK = new Map(FILTER_TYPES.map(([raw], i) => [raw, i]));
 TYPE_RANK.set('TSC', TYPE_RANK.get('14-DayGratitude'));
 let sortBy = 'dates';
@@ -303,7 +302,7 @@ list.addEventListener('keydown', e => {
 });
 
 const ymd = s => s.split('-').map(Number);
-// dateRange leaves out the year, which the month headings show: "Nov 18 – 29", "Nov 25 – Dec 6".
+// dateRange leaves out the year, which the year headings show: "Nov 18 – 29", "Nov 25 – Dec 6".
 // The end is faded so the start date stands out.
 function dateRange(a, b) {
   const [, am, ad] = ymd(a), [, bm, bd] = ymd(b);
@@ -614,20 +613,18 @@ function render() {
   const { filters: f, shown, partial, loading, error, reason } = searchResult;
   list.dataset.as = f.as;
 
-  const months = new Map();
+  const years = new Map();
   for (const item of shown) {
-    const key = item[0].start.slice(0, 7);
-    if (!months.has(key)) months.set(key, []);
-    months.get(key).push(item);
+    const year = item[0].start.slice(0, 4);
+    if (!years.has(year)) years.set(year, []);
+    years.get(year).push(item);
   }
-  if (sortBy === 'type') for (const items of months.values()) items.sort(([a], [b]) => TYPE_RANK.get(a.type) - TYPE_RANK.get(b.type));
+  if (sortBy === 'type') for (const items of years.values()) items.sort(([a], [b]) => TYPE_RANK.get(a.type) - TYPE_RANK.get(b.type));
   list.innerHTML = shown.length
-    ? headHTML(f) + [...months].map(([key, items]) => {
-        const [y, m] = ymd(key);
-        return `<section class="month"><h2>${y} ${MONTHS[m - 1]}<span class="count">${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}</section>`;
-      }).join('')
+    ? headHTML(f) + [...years].map(([year, items]) =>
+        `<section class="year"><h2>${year}<span class="count">${items.length}</span></h2>${items.map(([c, avail]) => rowHTML(c, avail, f)).join('')}</section>`).join('')
     : loading ? '<p class="empty">Searching…</p>' : error ? '<p class="empty">Search unavailable. Press Search to retry.</p>' : reason === 'cancelled' ? '<p class="empty">Search cancelled.</p>' : '<p class="empty">No courses you can sign up for were found. Change the filters and search again.</p>';
-  // Month headings stick just below the column headings.
+  // Year headings stick just below the column headings.
   document.documentElement.style.setProperty('--head-h', (list.querySelector('.head')?.getBoundingClientRect().height ?? 0) + 'px');
   for (const id of openNotes) {
     const row = list.querySelector(`.row[data-id="${id}"]`);

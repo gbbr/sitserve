@@ -29,7 +29,7 @@
     --header-bg: #eae0cf;
     --header-fg: #6d563d;
     --header-line: #d6c4a9;
-    --month-bg: #f1e9da;
+    --year-bg: #f1e9da;
     --hl: rgba(133, 91, 48, .09);
     --notes-bg: #f3ebdd;
     --notes-fg: #604e3c;
@@ -83,7 +83,7 @@
     --header-bg: #30271f;
     --header-fg: #decbb0;
     --header-line: #514132;
-    --month-bg: #29221c;
+    --year-bg: #29221c;
     --hl: rgba(213, 174, 124, .12);
     --notes-bg: #28211b;
     --notes-fg: #d1bea3;
@@ -259,9 +259,9 @@
   .column-head.dragging { opacity: .35; }
   .column-head[data-drop=before] { box-shadow: -3px 0 var(--link); }
   .column-head[data-drop=after] { box-shadow: 3px 0 var(--link); }
-  /* Month headings are a dimmer band than the column headings, also spanning the page width. Each
-     month is its own section, so the next heading pushes the stuck one away. */
-  h2 { position: sticky; top: calc(var(--bar-h, 0px) + var(--head-h, 0px) - 2px); z-index: 4; margin: 0; padding: 10px 8px 9px; background: var(--month-bg); border-bottom: 1px solid var(--line); box-shadow: 0 0 0 100vmax var(--month-bg); clip-path: inset(0 -100vmax); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  /* Year headings are a dimmer band than the column headings, also spanning the page width. Each
+     year is its own section, so the next heading pushes the stuck one away. */
+  h2 { position: sticky; top: calc(var(--bar-h, 0px) + var(--head-h, 0px) - 2px); z-index: 4; margin: 0; padding: 10px 8px 9px; background: var(--year-bg); border-bottom: 1px solid var(--line); box-shadow: 0 0 0 100vmax var(--year-bg); clip-path: inset(0 -100vmax); color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
   h2::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--line); box-shadow: 0 0 0 100vmax var(--line); clip-path: inset(0 -100vmax); pointer-events: none; }
   h2 .count { display: inline-block; min-width: 24px; margin-left: 8px; padding: 0 6px; border-radius: 9px; background: color-mix(in srgb, var(--header-line) 45%, var(--header-bg)); color: var(--muted); font-size: 10px; font-weight: 500; line-height: 16px; text-align: center; vertical-align: 1px; }
 
@@ -377,14 +377,14 @@
        right edge, then dates, type and Apply. Flex order keeps this independent of the saved
        desktop column order; ::after breaks the line.
        The column headings shrink to the lights' key, in a band that takes no space and sticks at
-       the top. Month headings are transparent and sit above it, so the stuck one shares the band
-       and the next pushes it away, while each month's dimmer band (.month::before) stays in the
+       the top. Year headings are transparent and sit above it, so the stuck one shares the band
+       and the next pushes it away, while each year's dimmer band (.year::before) stays in the
        list and slides under it. */
     main { padding: 0 0 32px; }
     .result-limit, footer { padding-right: 12px; padding-left: 12px; }
     h2 { top: 0; z-index: 6; display: flex; align-items: center; width: fit-content; height: var(--key-h); padding: 0 12px; border: 0; background: none; box-shadow: none; clip-path: none; }
     h2::after { content: none; }
-    .month::before { content: ''; display: block; height: var(--key-h); margin-bottom: calc(-1 * var(--key-h)); border-bottom: 1px solid var(--line); background: var(--month-bg); }
+    .year::before { content: ''; display: block; height: var(--key-h); margin-bottom: calc(-1 * var(--key-h)); border-bottom: 1px solid var(--line); background: var(--year-bg); }
     .row { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; min-height: 0; padding: 7px 12px 8px; }
     .row::after { content: ''; order: 3; flex-basis: 100%; }
     .row.head { top: 0; align-items: flex-end; justify-content: flex-end; height: var(--key-h); margin-bottom: calc(-1 * var(--key-h)); padding: 0 12px 3px; }
