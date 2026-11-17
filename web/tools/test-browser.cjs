@@ -531,9 +531,9 @@ async function main() {
         const dates = box('dates'), type = box('type'), lights = box('lights'), soon = row.querySelector('.soon');
         return {
           height: r.height,
-          line1: spread([location, links, apply]),
-          line2: spread([dates, type, lights]),
-          stacked: Math.min(dates.top, type.top, lights.top) >= Math.max(location.bottom, apply.bottom) - 1,
+          line1: spread([location, links, lights]),
+          line2: spread([dates, type, apply]),
+          stacked: Math.min(dates.top, type.top, apply.top) >= Math.max(location.bottom, lights.bottom) - 1,
           applyInset: r.right - apply.right, lightsInset: r.right - lights.right, iconGap: links.left - location.right,
           button: row.querySelector('[data-column=apply] > *').innerText,
           soon: soon && getComputedStyle(soon).display !== 'none' ? soon.textContent : null,

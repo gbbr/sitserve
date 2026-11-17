@@ -333,7 +333,7 @@
   /* Location shown while hovering a flag */
   #tip { position: fixed; z-index: 30; max-width: min(340px, calc(100vw - 16px)); overflow-wrap: anywhere; white-space: pre-line; padding: 4px 8px; border-radius: 6px; background: var(--fg); color: var(--bg); font-size: 12.5px; pointer-events: none; }
 
-  /* Narrow screens: name on the first line, details on the second, lights (labelled) on the third */
+  /* Narrow screens: the filter bar scrolls away, and rows take two lines under one sticky lights key */
   @media (max-width: 820px) {
     :root { --key-h: 40px; }
     .bar { position: static; }
@@ -363,8 +363,8 @@
     .filter-main #search { order: 3; flex-basis: 100%; height: 34px; margin-right: 0; }
     .search-state { order: 4; flex-basis: 100%; justify-content: center; margin: 0; }
     .place-options { width: 100%; }
-    /* Rows run edge to edge in two lines: the name, its icons and Apply, then dates, type and the
-       lights in fixed slots at the right edge. Flex order keeps this independent of the saved
+    /* Rows run edge to edge in two lines: the name, its icons and the lights in fixed slots at the
+       right edge, then dates, type and Apply. Flex order keeps this independent of the saved
        desktop column order; ::after breaks the line.
        The column headings shrink to the lights' key, in a band that takes no space and sticks at
        the top. Month headings are transparent and sit above it, so the stuck one shares the band
@@ -382,11 +382,12 @@
     .head .column-head::before { content: none; }
     .row.head .l { height: auto; }
     .head .l.hl { color: var(--fg); }
-    [data-column=location] { order: 0; max-width: calc(100% - 128px); }
+    [data-column=location] { order: 0; max-width: calc(100% - 150px); }
     [data-column=links] { order: 1; display: flex; gap: 0; margin-right: auto; }
     [data-column=links] > span:empty { display: none; }
-    [data-column=apply] { order: 2; }
-    [data-column=dates], [data-column=type], [data-column=lights] { order: 4; }
+    [data-column=lights] { order: 2; }
+    [data-column=dates], [data-column=type], [data-column=apply] { order: 4; }
+    [data-column=apply] { margin-left: auto; }
     .dates { min-width: 92px; color: var(--muted); font-size: 13px; }
     .type-code { padding: 0 5px; font-size: 11.5px; line-height: 17px; }
     .lights { gap: 8px; align-self: auto; margin-left: auto; }

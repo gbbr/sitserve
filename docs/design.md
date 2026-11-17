@@ -231,8 +231,8 @@ city, short name, subdomain and codes such as "WA" or "IN".
   their dimmer band; as one arrives, its band slides under the sticky one and its label pushes
   the previous month's out. Rows
   run edge to edge with small insets, in two lines: the flag, name, schedule and notes icons, with
-  Apply at the right edge; then the dates, type and lights. The lights sit at the right in six
-  fixed, unlabeled slots under the key. A position a course doesn't offer leaves its slot empty,
+  the lights at the right edge; then the dates, type and Apply. The lights sit in six fixed,
+  unlabeled slots under the key. A position a course doesn't offer leaves its slot empty,
   so each position lines up down the list. Flex order keeps this arrangement independent of the
   saved desktop column order.
 - No horizontal scrolling at phone widths; controls and suggestion panels stay within the
