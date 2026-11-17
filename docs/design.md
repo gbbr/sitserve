@@ -132,19 +132,16 @@ in `web/index.html`. The backend is described in [architecture.md](architecture.
      out; hovering shows full dates with weekdays.
   3. **Type**: a compact badge with the chip code, centered under a centered heading; see
      [Type badges](#type-badges). Hovering shows the full name and, on a second line, the
-     languages.
+     languages. The notes icon follows the badge when comments exist; it toggles an inline
+     panel under the row with the comments (sanitized by the Worker and again in the browser),
+     languages, and the location's own course label when it says more than the standard type.
+     Open panels survive filter changes and column reordering while their courses remain shown.
   4. **Lights**: six columns under a two-row heading, NEW / OLD / SRV over M F, with each pair
      closer together than the groups; see [Lights](#lights).
-  5. **Apply**: a quiet, accent-colored, button-style link that opens the application form in
-     another tab; hover strengthens it and keyboard focus shows an outline. Before registration
-     opens, a disabled button of the same size shows the opening date, day first ("2 Mar"), with
-     the full date on hover. On phones that button says Apply, and "Opens 2 Mar" replaces the
-     lights.
-  6. **Links**: the schedule calendar icon, then the notes icon when comments exist, always last.
-     Notes toggle an inline panel under the row with the comments (sanitized by the Worker and
-     again in the browser), languages, and the location's own course label when it says more than
-     the standard type. Open panels survive filter changes and column reordering while their
-     courses remain shown.
+  5. **Schedule**: a quiet, accent-colored, button-style Apply link to the location's course
+     schedule on dhamma.org, in another tab; hover strengthens it and keyboard focus shows an
+     outline. Before registration opens, the same link shows the opening date instead, day
+     first ("2 Mar"), in a muted style, with the full date on hover.
 - **Tooltips**: every hover uses one instant custom tooltip (`data-tip`), because native `title`
   tooltips lag or don't show. Tooltips, the location photo and hover styles follow a mouse only,
   since touch browsers report a tap as a hover. On touch, tapping a row's flag, dates, type
@@ -230,8 +227,8 @@ city, short name, subdomain and codes such as "WA" or "IN".
   in the column headings' color that sticks at the top of the viewport. The current year's label
   sits at its left, so the year and the key share one band. Further down, year headings keep
   their dimmer band; as one arrives, its band slides under the sticky one and its label pushes
-  the previous year's out. Rows run edge to edge with small insets, in two lines: the flag, name,
-  schedule and notes icons, with the lights at the right edge; then the dates, type and Apply. The
+  the previous year's out. Rows run edge to edge with small insets, in two lines: the flag and name,
+  with the lights at the right edge; then the dates, type, notes icon and Apply. The
   lights sit in six fixed, unlabeled slots under the key. A position a course doesn't offer leaves
   its slot empty, so each position lines up down the list. Flex order keeps this arrangement independent of the
   saved desktop column order.

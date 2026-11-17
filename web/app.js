@@ -213,14 +213,14 @@ document.addEventListener('pointerdown', e => { if (!e.target.closest('#where-bo
 const DISPLAY_COLUMNS = {
   location: { label: 'Location', width: 'minmax(0, 1fr)' },
   dates: { label: 'Dates', width: '120px' },
-  type: { label: 'Type', width: '84px' },
+  type: { label: 'Type', width: '124px' },
   lights: { label: 'Availability', width: '108px' },
-  apply: { label: 'Apply', width: '84px' },
-  links: { label: 'Links', width: '48px' },
+  apply: { label: 'Schedule', width: '84px' },
 };
 let columnOrder = Object.keys(DISPLAY_COLUMNS);
 try {
-  const saved = JSON.parse(localStorage.getItem('sit.columns'));
+  // Orders saved while rows had a Links column still apply without it.
+  const saved = JSON.parse(localStorage.getItem('sit.columns'))?.filter?.(k => k !== 'links');
   if (Array.isArray(saved) && saved.length === columnOrder.length && new Set(saved).size === columnOrder.length && saved.every(k => Object.hasOwn(DISPLAY_COLUMNS, k))) columnOrder = saved;
 } catch { /* blocked storage or an invalid saved order: use the default */ }
 
@@ -362,17 +362,15 @@ $('.from-filter').addEventListener('click', e => {
 const toFragment = f => serializeFilters(f, { today: TODAY });
 const fromFragment = () => parseFilters(location.hash, { today: TODAY });
 
-const link = (href, label, icon) => href ? `<a class="icon" href="${esc(href)}" target="_blank" rel="noopener" data-tip="${label}" aria-label="${label}">${icon}</a>` : '<span></span>';
-
 function rowHTML(c, avail, f) {
   const l = c.loc;
   const statuses = avail === 'soon' ? {} : lights(c);
-  // Before registration opens, the button shows the date on wide screens; phones show a disabled
-  // Apply there and the date in place of the lights.
-  const opens = `${ymd(c.enroll)[2]} ${MON[ymd(c.enroll)[1] - 1]}`;
-  const reg = avail === 'soon'
-    ? `<button type="button" class="opens" disabled aria-label="Registration opens ${esc(longDate(c.enroll))}"><span class="wide">${opens}</span><span class="narrow">Apply</span></button>`
-    : `<a href="${esc(c.apply)}" target="_blank" rel="noopener" aria-label="${esc(`Apply for ${TYPE.get(c.type).name} at ${l.name}, ${longDate(c.start)}`)}">Apply</a>`;
+  // Apply opens the location's course schedule. Before registration opens, the same link shows
+  // the opening date in a muted style.
+  const soon = avail === 'soon', opens = `${ymd(c.enroll)[2]} ${MON[ymd(c.enroll)[1] - 1]}`;
+  const label = `${soon ? `Registration opens ${longDate(c.enroll)}. ` : ''}Apply through the course schedule for ${l.name}`;
+  const reg = l.schedule ? `<a${soon ? ' class="opens"' : ''} href="${esc(l.schedule)}" target="_blank" rel="noopener" aria-label="${esc(label)}">${soon ? opens : 'Apply'}</a>`
+    : soon ? `<span class="opens">${opens}</span>` : '';
   const cell = k => {
     const s = statuses[k], hl = k === f.as ? ' hl' : '';
     return s
@@ -383,10 +381,9 @@ function rowHTML(c, avail, f) {
   const cells = {
     location: `<span class="who" data-column="location"><span class="flag" role="img" aria-label="${esc(l.venue ? `${l.venue}, ${l.place}` : l.place)}" data-tip="${esc(l.venue ? `${l.venue}\n${l.place}` : l.place)}">${flag(l.cc)}</span>${l.web ? `<a class="name" href="${esc(l.web)}" target="_blank" rel="noopener"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</a>` : `<span class="name"${l.photo ? ` data-photo="${esc(l.photo)}"` : ''}>${esc(l.name.replace(/^Dhamma\s+/, ''))}</span>`}${l.center ? '' : '<span class="kind noncenter" data-tip="non-center"></span>'}</span>`,
     dates: `<span class="dates" data-column="dates" data-tip="${esc(`${longDate(c.start)} – ${longDate(c.end)}`)}">${dateRange(c.start, c.end)}</span>`,
-    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}${BADGE_TONES.get(c.type).solid ? ' solid' : ''}" style="--shade: ${BADGE_TONES.get(c.type).shade}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span></span>`,
-    lights: `<span class="lights" data-column="lights">${lightCells}${avail === 'soon' ? `<span class="soon narrow" aria-hidden="true">Opens ${opens}</span>` : ''}</span>`,
-    apply: `<span class="reg" data-column="apply"${avail === 'soon' ? ` data-tip="Registration opens ${esc(longDate(c.enroll))}"` : ''}>${reg}</span>`,
-    links: `<span class="links" data-column="links">${link(l.schedule, 'Course schedule', ICONS.schedule)}${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
+    type: `<span class="type" data-column="type"><span class="type-code ${typeClass(c.type)}${BADGE_TONES.get(c.type).solid ? ' solid' : ''}" style="--shade: ${BADGE_TONES.get(c.type).shade}" data-tip="${esc(`${typeTip(c.type)}\n${c.langs.join(', ')}`)}">${esc(TYPE.get(c.type).short)}</span>${c.hasNotes ? `<button type="button" class="icon note" data-tip="Notes" aria-label="Notes" aria-expanded="false">${ICONS.notes}</button>` : ''}</span>`,
+    lights: `<span class="lights" data-column="lights">${lightCells}</span>`,
+    apply: `<span class="reg" data-column="apply"${soon ? ` data-tip="Registration opens ${esc(longDate(c.enroll))}"` : ''}>${reg}</span>`,
   };
   return `<div class="row" data-id="${c.id}">${columnOrder.map(key => cells[key]).join('')}</div>`;
 }

@@ -109,7 +109,7 @@ async function main() {
     const courses = require('../../worker/fixtures/dhamma/corpus.json').map(normalize).filter(Boolean);
     const baseline = courses.filter(c => baselineIDs.includes(c.id));
     const { PLACES: places } = await import('../places.js');
-    const defaultOrder = ['location', 'dates', 'type', 'lights', 'apply', 'links'];
+    const defaultOrder = ['location', 'dates', 'type', 'lights', 'apply'];
     const expected = require('../../worker/fixtures/dhamma/browser-expected.json');
 
     await check('From defaults to the local day and preserves an explicit shared date', async () => {
@@ -221,15 +221,21 @@ async function main() {
       assert.ok(await page.locator('.reg a').first().evaluate(a => getComputedStyle(a).height === '24px'));
       assert.ok(await page.locator('.row[data-id]').evaluateAll(rows => rows.every(row => {
         const note = row.querySelector('.note');
-        return !note || (note.parentElement.dataset.column === 'links' && note === note.parentElement.lastElementChild);
-      })));
+        return !note || (note.parentElement.dataset.column === 'type' && note.previousElementSibling.classList.contains('type-code'));
+      })), 'the notes icon follows the type badge');
+      assert.ok(await page.locator('.row[data-id] .reg a').evaluateAll((links, schedules) => links.length > 0 && links.every(a =>
+        (a.textContent === 'Apply' || a.classList.contains('opens')) && a.href === schedules[a.closest('.row').dataset.id]), Object.fromEntries(baseline.map(c => [c.id, c.loc.schedule]))),
+        'Apply links to the location\'s course schedule');
       await page.waitForFunction(() => [...document.querySelectorAll('.flag img')].every(img => img.complete));
       assert.ok(await page.locator('.flag img').evaluateAll(imgs => imgs.length > 0 && imgs.every(img => {
         const rect = img.getBoundingClientRect();
         return img.naturalWidth > 0 && Math.abs(img.naturalWidth / img.naturalHeight - 4 / 3) < .01
           && rect.width === 16 && rect.height === 12;
       })));
-      assert.ok(await page.locator('.type').first().evaluate(el => getComputedStyle(el).justifyContent === 'center'));
+      assert.ok(await page.locator('.row[data-id] .type').evaluateAll(cells => cells.some(cell => cell.querySelector('.note')) && cells.every(cell => {
+        const center = r => r.left + r.width / 2, badge = cell.querySelector('.type-code').getBoundingClientRect(), note = cell.querySelector('.note')?.getBoundingClientRect();
+        return Math.abs(center(badge) - center(cell.getBoundingClientRect())) < 1 && (!note || (note.left >= badge.right && note.right <= cell.getBoundingClientRect().right));
+      })), 'badges stay centered with the notes icon beside them');
       assert.ok(await page.locator('.filter-row').evaluateAll(rows => rows.every(row => {
         const cells = [...row.children].filter(el => !el.hidden).map(el => el.getBoundingClientRect());
         return cells.every(r => Math.abs(r.top + r.height / 2 - cells[0].top - cells[0].height / 2) < 1);
@@ -453,6 +459,9 @@ async function main() {
       await page.keyboard.press('Alt+ArrowRight');
       assert.equal((await order())[1], 'type');
       assert.equal(await page.locator('.column-head[data-column=type]').evaluate(el => el === document.activeElement), true);
+      await page.evaluate(() => localStorage.setItem('sit.columns', JSON.stringify(['type', 'location', 'dates', 'lights', 'apply', 'links'])));
+      await reload();
+      assert.deepEqual(await order(), ['type', 'location', 'dates', 'lights', 'apply'], 'orders saved with a Links column still apply');
       await page.evaluate(() => localStorage.removeItem('sit.columns'));
       await reload();
     });
@@ -529,28 +538,29 @@ async function main() {
       const rows = await page.evaluate(() => [...document.querySelectorAll('.row[data-id]')].map(row => {
         const box = k => row.querySelector(`[data-column=${k}]`).getBoundingClientRect();
         const spread = boxes => Math.max(...boxes.map(b => b.top + b.height / 2)) - Math.min(...boxes.map(b => b.top + b.height / 2));
-        const r = row.getBoundingClientRect(), location = box('location'), links = box('links'), apply = box('apply');
-        const dates = box('dates'), type = box('type'), lights = box('lights'), soon = row.querySelector('.soon');
+        const r = row.getBoundingClientRect(), location = box('location'), apply = box('apply');
+        const dates = box('dates'), type = box('type'), lights = box('lights'), soon = row.querySelector('.reg .opens');
         return {
           height: r.height,
-          line1: spread([location, links, lights]),
+          line1: spread([location, lights]),
           line2: spread([dates, type, apply]),
           stacked: Math.min(dates.top, type.top, apply.top) >= Math.max(location.bottom, lights.bottom) - 1,
-          applyInset: r.right - apply.right, lightsInset: r.right - lights.right, iconGap: links.left - location.right,
-          button: row.querySelector('[data-column=apply] > *').innerText,
-          soon: soon && getComputedStyle(soon).display !== 'none' ? soon.textContent : null,
+          applyInset: r.right - apply.right, lightsInset: r.right - lights.right,
+          button: row.querySelector('[data-column=apply] > a').innerText,
+          noteGap: (note => note ? note.getBoundingClientRect().left - row.querySelector('.type-code').getBoundingClientRect().right : 6)(row.querySelector('.note')),
+          soon: !!soon,
         };
       }));
       assert.ok(rows.length > 3 && rows.some(r => r.soon), 'fixture needs a course that is not open yet');
       for (const r of rows) {
         assert.ok(r.height < 70 && r.line1 < 2 && r.line2 < 2 && r.stacked, `two lines: ${JSON.stringify(r)}`);
-        assert.ok(Math.abs(r.applyInset - 12) < 1 && Math.abs(r.lightsInset - 12) < 1 && Math.abs(r.iconGap - 6) < 1, `edges: ${JSON.stringify(r)}`);
-        assert.equal(r.button, 'Apply');
-        if (r.soon) assert.match(r.soon, /^Opens \d+ [A-Z][a-z]{2}$/);
+        assert.ok(Math.abs(r.applyInset - 12) < 1 && Math.abs(r.lightsInset - 12) < 1, `edges: ${JSON.stringify(r)}`);
+        if (r.soon) assert.match(r.button, /^\d+ [A-Z][a-z]{2}$/); else assert.equal(r.button, 'Apply');
+        assert.ok(Math.abs(r.noteGap - 6) < 1, `notes icon beside the type: ${JSON.stringify(r)}`);
       }
       // One lights key sits over the lights' fixed slots; year headings carry none.
       const offsets = await page.evaluate(() => {
-        const row = [...document.querySelectorAll('.row[data-id]')].find(r => !r.querySelector('.soon'));
+        const row = [...document.querySelectorAll('.row[data-id]')].find(r => !r.querySelector('.reg .opens'));
         const centers = els => [...els].map(el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; });
         const lights = centers(row.querySelectorAll('.lights .l'));
         return centers(document.querySelectorAll('.head .l')).map((x, i) => Math.abs(x - lights[i]));

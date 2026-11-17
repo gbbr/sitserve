@@ -64,10 +64,10 @@
     --special-solid-b: #0b4834;
     --special-ink: #16513c;
     --long-tint-a: #faedfa;
-    --long-tint-b: #d9bae7;
+    --long-tint-b: #c597de;
     --long-solid-a: #8050a0;
     --long-solid-b: #3e256e;
-    --long-ink: #562b71;
+    --long-ink: #4a2063;
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
@@ -118,10 +118,10 @@
     --special-solid-b: #9dd3b5;
     --special-ink: #b0dec4;
     --long-tint-a: #2d2230;
-    --long-tint-b: #4b355b;
+    --long-tint-b: #684a80;
     --long-solid-a: #9f76cb;
     --long-solid-b: #dab3ed;
-    --long-ink: #e3c4f1;
+    --long-ink: #efdaf7;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -238,7 +238,7 @@
 
   /* Course list: one grid row per course */
   main { max-width: 1180px; margin: 0 auto; padding: 0 16px 32px; }
-  .row { display: grid; grid-template-columns: var(--columns, minmax(0, 1fr) 120px 84px 108px 84px 48px); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: var(--columns, minmax(0, 1fr) 120px 124px 108px 84px); align-items: center; column-gap: 10px; min-height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); }
   @media (hover: hover) { .row:not(.head):hover { background: var(--hover); } }
   .head { position: sticky; top: calc(var(--bar-h, 0px) - 1px); z-index: 5; padding-top: 3px; padding-bottom: 3px; border-bottom-color: var(--header-line); background: var(--header-bg); box-shadow: 0 0 0 100vmax var(--header-bg); clip-path: inset(0 -100vmax); color: var(--header-fg); }
   .head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--header-line); box-shadow: 0 0 0 100vmax var(--header-line); clip-path: inset(0 -100vmax); pointer-events: none; }
@@ -247,7 +247,7 @@
   .column-head + .column-head::before { content: ''; position: absolute; left: -5px; top: 4px; bottom: 4px; width: 1px; background: var(--header-line); }
   @media (hover: hover) { .column-head:hover { color: var(--fg); } }
   .column-head:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-  .column-head[data-column=type], .column-head[data-column=apply], .column-head[data-column=links] { justify-content: center; }
+  .column-head[data-column=type], .column-head[data-column=apply] { justify-content: center; }
   /* Dates and Type sort the rows. A chevron beside the label marks the active sort and hints at the
      other on hover; it sits outside the label's box so centered labels stay aligned with their column. */
   .column-head.sortable { cursor: pointer; }
@@ -276,7 +276,10 @@
   .dates { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .dates .end { opacity: .4; }
   .dates .mon { display: inline-block; min-width: 2em; } /* fits May, the widest month */
-  .type { display: flex; align-items: center; justify-content: center; min-width: 0; color: var(--muted); font-size: 12px; }
+  /* The badge stays centered in its column, with the notes icon in the right-hand track. */
+  .type { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 3px; min-width: 0; color: var(--muted); font-size: 12px; }
+  .type .type-code { grid-column: 2; }
+  .type .note { grid-column: 3; justify-self: start; }
   .type > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .type-code { display: inline-block; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; line-height: 16px; }
   /* Result badges. Within a color group, types in filter order run from light tints to solid
@@ -288,17 +291,16 @@
   .type-code.special { --tint-a: var(--special-tint-a); --tint-b: var(--special-tint-b); --solid-a: var(--special-solid-a); --solid-b: var(--special-solid-b); --ink: var(--special-ink); }
   .type-code.long { --tint-a: var(--long-tint-a); --tint-b: var(--long-tint-b); --solid-a: var(--long-solid-a); --solid-b: var(--long-solid-b); --ink: var(--long-ink); }
 
-  .links { display: grid; grid-template-columns: 22px 22px; gap: 4px; }
   .icon { display: grid; flex: none; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--faint); cursor: pointer; }
   .icon[aria-expanded=true] { background: var(--icon-hover); color: var(--fg); }
   @media (hover: hover) { .icon:hover { background: var(--icon-hover); color: var(--fg); } }
   .icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
   .reg { display: grid; justify-items: center; white-space: nowrap; font-size: 13px; }
-  .reg a, .reg button { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 24px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--link) 22%, var(--bg)); border-radius: 6px; background: color-mix(in srgb, var(--link) 6%, var(--bg)); color: var(--link); font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1; text-decoration: none; }
-  @media (hover: hover) { .reg a:hover { border-color: color-mix(in srgb, var(--link) 45%, var(--bg)); background: color-mix(in srgb, var(--link) 12%, var(--bg)); } }
+  .reg > * { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 24px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--link) 22%, var(--bg)); border-radius: 6px; background: color-mix(in srgb, var(--link) 6%, var(--bg)); color: var(--link); font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1; text-decoration: none; }
+  @media (hover: hover) { .reg a:not(.opens):hover { border-color: color-mix(in srgb, var(--link) 45%, var(--bg)); background: color-mix(in srgb, var(--link) 12%, var(--bg)); } }
   .reg a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-  .reg .opens { border-color: var(--control-border); background: var(--hover); color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; pointer-events: none; }
+  .reg .opens { border-color: var(--control-border); background: var(--hover); color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
 
   /* Status lights: new, old and server groups, each with a male and a female column */
   .lights { display: flex; gap: 12px; align-self: stretch; }
@@ -315,7 +317,6 @@
   #list[data-as]:not([data-as=any]) .l:not(.hl) i.light { opacity: .28; }
   .l.hl i.light { width: 10px; height: 10px; }
   /* Phone-only: the opening date beside the lights. */
-  .narrow { display: none; }
 
   /* Notes */
   .notes { padding: 8px 12px 10px 38px; border-bottom: 1px solid var(--line); background: var(--notes-bg); color: var(--notes-fg); font-size: 13px; }
@@ -394,19 +395,15 @@
     .row.head .l { height: auto; }
     .head .l.hl { color: var(--fg); }
     [data-column=location] { order: 0; max-width: calc(100% - 150px); }
-    [data-column=links] { order: 1; display: flex; gap: 0; margin-right: auto; }
-    [data-column=links] > span:empty { display: none; }
     [data-column=lights] { order: 2; }
     [data-column=dates], [data-column=type], [data-column=apply] { order: 4; }
     [data-column=apply] { margin-left: auto; }
     .dates { min-width: 8.2em; color: var(--muted); font-size: 13px; } /* fits "Apr 28 – May 10", so type badges line up */
+    .type { display: flex; gap: 6px; }
     .type-code { padding: 0 5px; font-size: 11.5px; line-height: 17px; }
     .lights { gap: 8px; align-self: auto; margin-left: auto; }
     .grp { grid-template-columns: 12px 12px; }
     .row .l { height: 14px; }
-    .wide, .lights:has(.soon) .grp { display: none; }
-    .narrow { display: revert; }
-    .soon { color: var(--faint); font-size: 12px; white-space: nowrap; }
     .notes { padding: 8px 12px 10px 35px; }
   }
   @media (prefers-reduced-motion: reduce) {
